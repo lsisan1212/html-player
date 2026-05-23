@@ -1,0 +1,211 @@
+/* Theme Definitions */
+
+/* 1. Default Theme */
+.theme-default {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #404040;
+    --bg-controls: #252525;
+    --bg-hover: #505050;
+    --bg-overlay: rgba(0, 0, 0, 0.7);
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --border-color: #505050;
+    --buffer-color: #606060;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* 2. Dark Theme */
+.theme-dark {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #141414;
+    --bg-tertiary: #1f1f1f;
+    --bg-controls: #0f0f0f;
+    --bg-hover: #2a2a2a;
+    --bg-overlay: rgba(0, 0, 0, 0.85);
+    --text-primary: #e5e5e5;
+    --text-secondary: #737373;
+    --accent: #ef4444;
+    --accent-hover: #dc2626;
+    --border-color: #2a2a2a;
+    --buffer-color: #404040;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.8);
+}
+
+/* 3. Light Theme */
+.theme-light {
+    --bg-primary: #f5f5f5;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e5e5e5;
+    --bg-controls: #fafafa;
+    --bg-hover: #d4d4d4;
+    --bg-overlay: rgba(255, 255, 255, 0.9);
+    --text-primary: #171717;
+    --text-secondary: #525252;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --border-color: #d4d4d4;
+    --buffer-color: #a3a3a3;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* 4. Ocean Theme */
+.theme-ocean {
+    --bg-primary: #0c4a6e;
+    --bg-secondary: #075985;
+    --bg-tertiary: #0369a1;
+    --bg-controls: #082f49;
+    --bg-hover: #0e7490;
+    --bg-overlay: rgba(12, 74, 110, 0.8);
+    --text-primary: #f0f9ff;
+    --text-secondary: #bae6fd;
+    --accent: #06b6d4;
+    --accent-hover: #0891b2;
+    --border-color: #0e7490;
+    --buffer-color: #155e75;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* 5. Forest Theme */
+.theme-forest {
+    --bg-primary: #14532d;
+    --bg-secondary: #166534;
+    --bg-tertiary: #15803d;
+    --bg-controls: #052e16;
+    --bg-hover: #22c55e;
+    --bg-overlay: rgba(20, 83, 45, 0.8);
+    --text-primary: #f0fdf4;
+    --text-secondary: #bbf7d0;
+    --accent: #4ade80;
+    --accent-hover: #22c55e;
+    --border-color: #22c55e;
+    --buffer-color: #166534;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* 6. Sunset Theme */
+.theme-sunset {
+    --bg-primary: #7c2d12;
+    --bg-secondary: #9a3412;
+    --bg-tertiary: #c2410c;
+    --bg-controls: #431407;
+    --bg-hover: #ea580c;
+    --bg-overlay: rgba(124, 45, 18, 0.8);
+    --text-primary: #fff7ed;
+    --text-secondary: #fed7aa;
+    --accent: #fb923c;
+    --accent-hover: #f97316;
+    --border-color: #ea580c;
+    --buffer-color: #9a3412;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* 7. Purple Theme */
+.theme-purple {
+    --bg-primary: #581c87;
+    --bg-secondary: #6b21a8;
+    --bg-tertiary: #7e22ce;
+    --bg-controls: #3b0764;
+    --bg-hover: #9333ea;
+    --bg-overlay: rgba(88, 28, 135, 0.8);
+    --text-primary: #faf5ff;
+    --text-secondary: #e9d5ff;
+    --accent: #c084fc;
+    --accent-hover: #a855f7;
+    --border-color: #9333ea;
+    --buffer-color: #6b21a8;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* 8. Midnight Theme */
+.theme-midnight {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --bg-controls: #020617;
+    --bg-hover: #475569;
+    --bg-overlay: rgba(15, 23, 42, 0.85);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --border-color: #475569;
+    --buffer-color: #334155;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
+}
+
+/* 9. Neon Theme */
+.theme-neon {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #171717;
+    --bg-tertiary: #262626;
+    --bg-controls: #0a0a0a;
+    --bg-hover: #404040;
+    --bg-overlay: rgba(0, 0, 0, 0.9);
+    --text-primary: #ffffff;
+    --text-secondary: #a3a3a3;
+    --accent: #22d3ee;
+    --accent-hover: #06b6d4;
+    --border-color: #22d3ee;
+    --buffer-color: #404040;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 0 30px rgba(34, 211, 238, 0.3);
+}
+
+.theme-neon .control-btn:hover {
+    box-shadow: 0 0 10px var(--accent);
+}
+
+.theme-neon .progress-fill {
+    box-shadow: 0 0 10px var(--accent);
+}
+
+.theme-neon .volume-slider::-webkit-slider-thumb {
+    box-shadow: 0 0 10px var(--accent);
+}
+
+/* 10. Minimal Theme */
+.theme-minimal {
+    --bg-primary: #ffffff;
+    --bg-secondary: #fafafa;
+    --bg-tertiary: #f5f5f5;
+    --bg-controls: #ffffff;
+    --bg-hover: #e5e5e5;
+    --bg-overlay: rgba(255, 255, 255, 0.95);
+    --text-primary: #262626;
+    --text-secondary: #737373;
+    --accent: #171717;
+    --accent-hover: #404040;
+    --border-color: #e5e5e5;
+    --buffer-color: #d4d4d4;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.theme-minimal .control-btn {
+    opacity: 0.7;
+}
+
+.theme-minimal .control-btn:hover {
+    opacity: 1;
+}
+
+.theme-minimal .progress-bar {
+    height: 4px;
+}
+
+.theme-minimal .progress-bar:hover {
+    height: 6px;
+}
