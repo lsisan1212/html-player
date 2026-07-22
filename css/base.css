@@ -237,6 +237,13 @@ body {
     height: 100%;
     object-fit: contain;
     display: none;
+    transform-origin: center center;
+    transition: filter 0.35s ease, transform 0.35s ease;
+}
+
+.video-element.is-paused {
+    filter: grayscale(100%);
+    transform: scale(1.02);
 }
 
 .video-element.active {

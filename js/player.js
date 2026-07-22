@@ -45,10 +45,12 @@ class VideoPlayer {
 
         this.video.addEventListener('play', () => {
             this.updatePlayButton(true);
+            this.video.classList.remove('is-paused');
         });
 
         this.video.addEventListener('pause', () => {
             this.updatePlayButton(false);
+            this.video.classList.add('is-paused');
         });
 
         this.video.addEventListener('loadeddata', () => {
