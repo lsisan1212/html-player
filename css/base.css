@@ -1183,4 +1183,33 @@ body.is-pip .subtitle-container {
     .progress-bar {
         min-width: 0;
     }
+
+    /* ===== 全局強制單欄（行動版）===== */
+    *, *::before, *::after {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    html, body {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    img, video {
+        height: auto !important;
+    }
+    table {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+    }
+    pre, code {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    /* 例外交給 overflow:auto 的元素不要設 hidden */
+    .controls-row {
+        overflow-x: auto !important;
+    }
 }
