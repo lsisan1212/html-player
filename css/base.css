@@ -243,7 +243,6 @@ body {
 
 .video-element.is-paused {
     filter: grayscale(100%);
-    transform: scale(1.02);
 }
 
 .video-element.active {
@@ -1043,42 +1042,145 @@ body.is-pip .subtitle-container {
     height: 100vh;
 }
 
-/* ===== Responsive ===== */
+/* ===== Responsive (≤768px) ===== */
 @media (max-width: 768px) {
     .app-main {
-        padding: 1rem;
+        padding: 0.5rem;
     }
-    
+
     .bottom-panel {
-        padding: 0 1rem;
+        padding: 0 0.5rem;
     }
-    
+
     .panel-inner {
         grid-template-columns: 1fr;
-    }
-    
-    .controls-row {
-        flex-wrap: wrap;
         gap: 0.5rem;
     }
-    
-    .volume-slider {
-        width: 60px;
+
+    /* 控制列改為水平滾動，所有按鈕可觸及 */
+    .controls-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 0.35rem;
+        padding-bottom: 6px;
+        scrollbar-width: none;          /* Firefox */
     }
-    
+    .controls-row::-webkit-scrollbar { /* Chrome/Safari */
+        display: none;
+    }
+
+    .controls-left,
+    .controls-center,
+    .controls-right {
+        flex: 0 0 auto;
+        gap: 0.2rem;
+    }
+
+    .control-btn {
+        padding: 0.35rem;
+    }
+
+    .control-btn .icon {
+        font-size: 1rem;
+    }
+
+    .volume-slider {
+        width: 48px;
+    }
+
+    .volume-value {
+        display: none;
+    }
+
+    .speed-select {
+        font-size: 0.75rem;
+        padding: 2px 4px;
+    }
+
+    .theme-dropdown {
+        max-width: 90vw;
+    }
+
     .theme-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .drop-title {
         font-size: 1.25rem;
     }
-    
+
     .drop-icon {
         font-size: 3rem;
     }
-    
+
     .shortcuts-list {
         grid-template-columns: 1fr;
+    }
+
+    /* 行動版 header 壓縮 */
+    .app-header {
+        padding: 0.35rem 0.5rem;
+    }
+    .header-content {
+        gap: 0.4rem;
+    }
+    .logo-text {
+        display: none;
+    }
+    .header-filename {
+        max-width: 40vw;
+    }
+    .header-filename-text {
+        font-size: 0.8rem;
+    }
+    .header-btn {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    /* 進度條區域緊湊 */
+    .progress-container {
+        gap: 0.35rem;
+        padding: 0 0.25rem;
+    }
+    .time-display {
+        font-size: 0.7rem;
+        min-width: 36px;
+    }
+
+    /* 速度選擇器縮小 */
+    .speed-selector {
+        font-size: 0.75rem;
+    }
+
+    /* 行動版寬度適配：杜絕橫向溢出 */
+    body {
+        overflow-x: hidden;
+    }
+    .app-main,
+    .bottom-panel {
+        max-width: 100%;
+        width: 100%;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .panel-inner {
+        width: 100%;
+        overflow-x: hidden;
+    }
+    .player-wrapper {
+        width: 100%;
+        overflow: hidden;
+    }
+    .panel-toggle {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .header-content {
+        max-width: 100%;
+    }
+    .progress-bar {
+        min-width: 0;
     }
 }

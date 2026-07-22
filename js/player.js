@@ -46,11 +46,13 @@ class VideoPlayer {
         this.video.addEventListener('play', () => {
             this.updatePlayButton(true);
             this.video.classList.remove('is-paused');
+            this._stopPauseZoom();
         });
 
         this.video.addEventListener('pause', () => {
             this.updatePlayButton(false);
             this.video.classList.add('is-paused');
+            this._startPauseZoom();
         });
 
         this.video.addEventListener('loadeddata', () => {
@@ -186,6 +188,29 @@ class VideoPlayer {
         this.video.pause();
         this.video.currentTime = 0;
         this.updatePlayButton(false);
+    }
+
+    /** 暫停時漸進縮放：桌面 2% → 5%，行動版 5% → 10% */
+    _startPauseZoom() {
+        this._stopPauseZoom();
+        const mobile = window.innerWidth <= 768;
+        let scale = mobile ? 1.05 : 1.02;
+        const target = mobile ? 1.10 : 1.05;
+        const increment = mobile ? 0.005 : 0.003;
+        this.video.style.transform = `scale(${scale})`;
+        this._pauseZoomTimer = setInterval(() => {
+            scale = Math.min(scale + increment, target);
+            this.video.style.transform = `scale(${scale})`;
+            if (scale >= target) clearInterval(this._pauseZoomTimer);
+        }, 80);
+    }
+
+    _stopPauseZoom() {
+        if (this._pauseZoomTimer) {
+            clearInterval(this._pauseZoomTimer);
+            this._pauseZoomTimer = null;
+        }
+        this.video.style.transform = '';
     }
 
     toggleLoop() {
