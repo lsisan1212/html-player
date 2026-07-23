@@ -14,6 +14,7 @@ class VideoPlayer {
     init() {
         this.setupEventListeners();
         this.setupDragAndDrop();
+        this.setupMobileTouchEvents();
     }
 
     setupEventListeners() {
@@ -307,6 +308,89 @@ class VideoPlayer {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // ---- Skip (前進/後退) ----
+    skipBackward(s = 5) { this.seek(this.video.currentTime - s); }
+    skipForward(s = 5) { this.seek(this.video.currentTime + s); }
+
+    // ---- 行動版雙擊 + 長按 ----
+    setupMobileTouchEvents() {
+        const video = this.video;
+        const zone = this.dropZone;
+        let longPressTimer = null, originalRate = 1;
+        let lastTap = 0, lastTapX = 0;
+        const dB = 300; // double-tap threshold ms
+
+        // 速度疊層
+        const speedOv = document.createElement('div');
+        speedOv.className = 'speed-overlay';
+        speedOv.textContent = '2x';
+        zone.appendChild(speedOv);
+        this._speedOverlay = speedOv;
+
+        // 點擊回饋
+        const tapFb = document.createElement('div');
+        tapFb.className = 'tap-feedback';
+        zone.appendChild(tapFb);
+        this._tapFeedback = tapFb;
+
+        video.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            e.preventDefault(); // 防止 iOS 長按選單
+            longPressTimer = setTimeout(() => {
+                originalRate = video.playbackRate;
+                video.playbackRate = 2.0;
+                speedOv.classList.add('visible');
+                const ss = document.getElementById('speed-select');
+                if (ss) ss.value = '2.0';
+            }, 500);
+        }, { passive: false });
+
+        const endLongPress = () => {
+            if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            if (speedOv.classList.contains('visible')) {
+                video.playbackRate = originalRate;
+                speedOv.classList.remove('visible');
+                const ss = document.getElementById('speed-select');
+                if (ss) ss.value = String(originalRate);
+            }
+        };
+
+        video.addEventListener('touchend', (e) => {
+            const wasLP = speedOv.classList.contains('visible');
+            endLongPress();
+            if (wasLP) return;
+
+            const now = Date.now();
+            const touch = e.changedTouches[0];
+            const x = touch ? touch.clientX : 0;
+            if (now - lastTap < dB && lastTap > 0) {
+                const rect = video.getBoundingClientRect();
+                const isL = (x - rect.left) < rect.width / 2;
+                if (isL) this.skipBackward(5); else this.skipForward(5);
+                this._showTapFeedback(isL);
+                lastTap = 0;
+            } else {
+                lastTap = now;
+                lastTapX = x;
+            }
+        });
+
+        video.addEventListener('touchmove', () => endLongPress());
+        video.addEventListener('touchcancel', () => endLongPress());
+        video.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    _showTapFeedback(isLeft) {
+        const fb = this._tapFeedback;
+        if (!fb) return;
+        fb.textContent = isLeft ? '⏪ -5s' : '⏩ +5s';
+        fb.style.left = isLeft ? '20%' : '';
+        fb.style.right = isLeft ? '' : '20%';
+        fb.classList.add('visible');
+        clearTimeout(this._fbTimer);
+        this._fbTimer = setTimeout(() => fb.classList.remove('visible'), 600);
     }
 }
 

@@ -25,6 +25,14 @@ class ControlsHandler {
             this.player.togglePlay();
         });
 
+        document.getElementById('skip-back-btn').addEventListener('click', () => {
+            this.player.skipBackward(5);
+        });
+
+        document.getElementById('skip-fwd-btn').addEventListener('click', () => {
+            this.player.skipForward(5);
+        });
+
         document.getElementById('stop-btn').addEventListener('click', () => {
             this.player.stop();
         });
