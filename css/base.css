@@ -1057,36 +1057,38 @@ body.is-pip .subtitle-container {
         gap: 0.5rem;
     }
 
-    /* 控制列改為水平滾動，所有按鈕可觸及 */
+    /* 控制列改為多行，不滾動 */
     .controls-row {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        gap: 0.35rem;
-        padding-bottom: 6px;
-        scrollbar-width: none;          /* Firefox */
-    }
-    .controls-row::-webkit-scrollbar { /* Chrome/Safari */
-        display: none;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.3rem 0.5rem;
+        padding: 4px 2px;
     }
 
     .controls-left,
     .controls-center,
     .controls-right {
-        flex: 0 0 auto;
-        gap: 0.2rem;
+        flex: 0 0 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        padding: 2px 0;
     }
+    /* 行與行之間微妙分隔 */
+    .controls-left  { border-bottom: 1px solid var(--border-color); padding-bottom: 4px; }
+    .controls-center { padding: 3px 0; }
 
     .control-btn {
-        padding: 0.35rem;
+        padding: 0.3rem 0.4rem;
+        min-width: 32px;
     }
 
     .control-btn .icon {
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
 
     .volume-slider {
-        width: 48px;
+        width: 60px;
     }
 
     .volume-value {
@@ -1207,9 +1209,9 @@ body.is-pip .subtitle-container {
         overflow-wrap: break-word !important;
         max-width: 100% !important;
     }
-    /* 例外交給 overflow:auto 的元素不要設 hidden */
-    .controls-row {
-        overflow-x: auto !important;
+    /* 例外：speed select 保留溢出自動 */
+    .speed-selector select {
+        max-width: 100%;
     }
 }
 
