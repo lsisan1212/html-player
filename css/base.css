@@ -19,8 +19,10 @@ body {
 .app-header {
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
-    padding: 0.75rem 1.5rem;
+    padding: 0.6rem 1.5rem;
     box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .header-content {
@@ -445,16 +447,17 @@ body {
 
 .progress-bar {
     flex: 1;
-    height: 6px;
+    height: 8px;
     background: var(--bg-tertiary);
-    border-radius: 3px;
+    border-radius: 4px;
     position: relative;
     cursor: pointer;
-    transition: height 0.2s ease;
+    transition: height 0.2s ease, box-shadow 0.2s ease;
 }
 
 .progress-bar:hover {
-    height: 10px;
+    height: 12px;
+    box-shadow: 0 0 16px rgba(99,102,241,.3);
 }
 
 .progress-buffer {
@@ -520,20 +523,23 @@ body {
     border: none;
     padding: 0.5rem;
     cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.2s ease;
+    border-radius: 10px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
+    opacity: 0.85;
 }
 
 .control-btn:hover {
     background: var(--bg-hover);
-    transform: scale(1.1);
+    transform: scale(1.12);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(99,102,241,.2);
 }
 
 .control-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.94);
 }
 
 .control-btn .icon {
