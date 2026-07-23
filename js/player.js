@@ -311,8 +311,8 @@ class VideoPlayer {
     }
 
     // ---- Skip (前進/後退) ----
-    skipBackward(s = 5) { this.seek(this.video.currentTime - s); }
-    skipForward(s = 5) { this.seek(this.video.currentTime + s); }
+    skipBackward(s) { s = s || 5; this.seek(this.video.currentTime - s); console.log('[Player] Skip backward', s+'s'); }
+    skipForward(s) { s = s || 5; this.seek(this.video.currentTime + s); console.log('[Player] Skip forward', s+'s'); }
 
     // ---- 行動版雙擊 + 長按 ----
     setupMobileTouchEvents() {
