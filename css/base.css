@@ -1042,6 +1042,33 @@ body.is-pip .subtitle-container {
     height: 100vh;
 }
 
+/* 全螢幕離開按鈕疊層 */
+.fs-overlay {
+    display: none;
+    position: absolute;
+    top: 0; right: 0;
+    z-index: 60;
+    padding: 12px;
+}
+.fs-overlay.visible { display: block; }
+.fs-exit-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,.25);
+    color: #fff;
+    font-size: 1.3em;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+}
+.fs-exit-btn:active { background: rgba(255,255,255,.5); }
+
+/* 全螢幕按鈕更亮 */
+#fullscreen-btn { opacity: 1 !important; background: rgba(255,255,255,.15); }
+#fullscreen-btn:hover { background: rgba(255,255,255,.3); }
+
 /* ===== Responsive (≤768px) ===== */
 @media (max-width: 768px) {
     .app-main {

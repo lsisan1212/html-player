@@ -15,6 +15,7 @@ class VideoPlayer {
         this.setupEventListeners();
         this.setupDragAndDrop();
         this.setupMobileTouchEvents();
+        this.setupFullscreenOverlay();
     }
 
     setupEventListeners() {
@@ -276,6 +277,28 @@ class VideoPlayer {
         }
     }
 
+    // ---- 全螢幕疊層（離開按鈕 + 自動隱藏控制列）----
+    setupFullscreenOverlay() {
+        const ctrls = document.getElementById('controls');
+        const fso = document.getElementById('fs-overlay');
+        const exitBtn = document.getElementById('fs-exit-btn');
+
+        if (exitBtn) {
+            exitBtn.addEventListener('click', () => document.exitFullscreen());
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                // 進入全螢幕：隱藏控制列
+                if (ctrls) ctrls.classList.add('auto-hide');
+            } else {
+                // 離開全螢幕：顯示控制列，隱藏疊層
+                if (ctrls) ctrls.classList.remove('auto-hide');
+                if (fso) fso.classList.remove('visible');
+            }
+        });
+    }
+
     async togglePictureInPicture() {
         try {
             if (document.pictureInPictureElement) {
@@ -389,7 +412,9 @@ class VideoPlayer {
                 clearTimeout(this._singleTapTimer);
                 this._singleTapTimer = setTimeout(() => {
                     const ctrls = document.getElementById('controls');
+                    const fso = document.getElementById('fs-overlay');
                     if (ctrls) ctrls.classList.toggle('auto-hide');
+                    if (fso && document.fullscreenElement) fso.classList.toggle('visible');
                 }, 300);
             }
         });
