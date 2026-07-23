@@ -1257,3 +1257,17 @@ body.is-pip .subtitle-container {
 
 /* ===== 行動版 skip 按鈕顯眼 ===== */
 .control-btn .icon { user-select: none; }
+
+/* ===== 控制列單擊切換顯示 ===== */
+#controls {
+    transition: opacity .3s ease, transform .3s ease;
+}
+#controls.auto-hide {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+}
+/* 全螢幕時進度條可觸控拖曳 */
+.progress-bar {
+    touch-action: none;
+}

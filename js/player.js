@@ -366,14 +366,31 @@ class VideoPlayer {
             const touch = e.changedTouches[0];
             const x = touch ? touch.clientX : 0;
             if (now - lastTap < dB && lastTap > 0) {
+                // 雙擊：依三區執行不同動作
+                clearTimeout(this._singleTapTimer);
                 const rect = video.getBoundingClientRect();
-                const isL = (x - rect.left) < rect.width / 2;
-                if (isL) this.skipBackward(5); else this.skipForward(5);
-                this._showTapFeedback(isL);
+                const relX = x - rect.left;
+                const third = rect.width / 3;
+                if (relX < third) {
+                    this.skipBackward(5);
+                    this._showTapFeedback('back');
+                } else if (relX < third * 2) {
+                    this.togglePlay();
+                    this._showTapFeedback('pause');
+                } else {
+                    this.skipForward(5);
+                    this._showTapFeedback('fwd');
+                }
                 lastTap = 0;
             } else {
                 lastTap = now;
                 lastTapX = x;
+                // 單擊延遲：300ms 無第二擊 → 切換控制列
+                clearTimeout(this._singleTapTimer);
+                this._singleTapTimer = setTimeout(() => {
+                    const ctrls = document.getElementById('controls');
+                    if (ctrls) ctrls.classList.toggle('auto-hide');
+                }, 300);
             }
         });
 
@@ -382,15 +399,18 @@ class VideoPlayer {
         video.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
-    _showTapFeedback(isLeft) {
+    _showTapFeedback(action) {
         const fb = this._tapFeedback;
         if (!fb) return;
-        fb.textContent = isLeft ? '⏪ -5s' : '⏩ +5s';
-        fb.style.left = isLeft ? '20%' : '';
-        fb.style.right = isLeft ? '' : '20%';
+        if (action === 'back') { fb.textContent = '⏪ -5s'; fb.style.left = '10%'; fb.style.right = 'auto'; }
+        else if (action === 'fwd') { fb.textContent = '⏩ +5s'; fb.style.left = 'auto'; fb.style.right = '10%'; }
+        else { fb.textContent = '⏯️'; fb.style.left = '50%'; fb.style.right = 'auto'; fb.style.transform = 'translate(-50%,-50%)'; }
         fb.classList.add('visible');
         clearTimeout(this._fbTimer);
-        this._fbTimer = setTimeout(() => fb.classList.remove('visible'), 600);
+        this._fbTimer = setTimeout(() => {
+            fb.classList.remove('visible');
+            fb.style.transform = '';
+        }, 600);
     }
 }
 

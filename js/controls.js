@@ -49,27 +49,44 @@ class ControlsHandler {
     setupProgressControls() {
         const progressBar = document.getElementById('progress-bar');
         
-        progressBar.addEventListener('click', (e) => {
+        const getTimeFromEvent = (e) => {
             const rect = progressBar.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            const time = percent * this.player.video.duration;
-            this.player.seek(time);
+            const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
+            const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            return percent * this.player.video.duration;
+        };
+
+        progressBar.addEventListener('click', (e) => {
+            this.player.seek(getTimeFromEvent(e));
         });
 
+        // 滑鼠拖曳
         progressBar.addEventListener('mousedown', (e) => {
             this.isDragging = true;
-            this.updateProgressFromEvent(e);
+            this.player.seek(getTimeFromEvent(e));
         });
 
         document.addEventListener('mousemove', (e) => {
-            if (this.isDragging) {
-                this.updateProgressFromEvent(e);
-            }
+            if (this.isDragging) this.player.seek(getTimeFromEvent(e));
         });
 
-        document.addEventListener('mouseup', () => {
-            this.isDragging = false;
-        });
+        document.addEventListener('mouseup', () => { this.isDragging = false; });
+
+        // 觸控拖曳（手機）
+        progressBar.addEventListener('touchstart', (e) => {
+            this.isDragging = true;
+            this.player.seek(getTimeFromEvent(e));
+            e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener('touchmove', (e) => {
+            if (this.isDragging) {
+                this.player.seek(getTimeFromEvent(e));
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => { this.isDragging = false; });
     }
 
     updateProgressFromEvent(e) {
