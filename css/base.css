@@ -1042,6 +1042,19 @@ body.is-pip .subtitle-container {
     height: 100vh;
 }
 
+/* 全螢幕控制列疊在影片上方 */
+:fullscreen #controls {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 55;
+    background: rgba(0,0,0,.7);
+    border-radius: 0;
+}
+:fullscreen #controls.auto-hide {
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* 全螢幕離開按鈕疊層 */
 .fs-overlay {
     display: none;
@@ -1052,22 +1065,29 @@ body.is-pip .subtitle-container {
 }
 .fs-overlay.visible { display: block; }
 .fs-exit-btn {
-    width: 40px; height: 40px;
+    width: 42px; height: 42px;
     border-radius: 50%;
-    border: none;
-    background: rgba(255,255,255,.25);
+    border: 2px solid rgba(255,255,255,.5);
+    background: rgba(0,0,0,.5);
     color: #fff;
-    font-size: 1.3em;
+    font-size: 1.4em;
+    font-weight: 700;
     cursor: pointer;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex; align-items: center; justify-content: center;
 }
-.fs-exit-btn:active { background: rgba(255,255,255,.5); }
+.fs-exit-btn:active { background: rgba(255,255,255,.3); }
 
-/* 全螢幕按鈕更亮 */
-#fullscreen-btn { opacity: 1 !important; background: rgba(255,255,255,.15); }
-#fullscreen-btn:hover { background: rgba(255,255,255,.3); }
+/* 全螢幕按鈕亮色 */
+#fullscreen-btn {
+    opacity: 1 !important;
+    background: #409eff !important;
+    color: #fff !important;
+    border-radius: 8px;
+}
+#fullscreen-btn:hover { background: #66b1ff !important; }
+#fullscreen-btn .icon { filter: none; }
 
 /* ===== Responsive (≤768px) ===== */
 @media (max-width: 768px) {
