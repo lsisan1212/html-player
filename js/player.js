@@ -277,24 +277,43 @@ class VideoPlayer {
         }
     }
 
-    // ---- 全螢幕疊層（離開按鈕 + 自動隱藏控制列）----
+    // ---- 全螢幕疊層（離開按鈕 + 旋轉 + 自動隱藏控制列）----
     setupFullscreenOverlay() {
         const ctrls = document.getElementById('controls');
         const fso = document.getElementById('fs-overlay');
         const exitBtn = document.getElementById('fs-exit-btn');
+        const rotateBtn = document.getElementById('fs-rotate-btn');
 
         if (exitBtn) {
             exitBtn.addEventListener('click', () => document.exitFullscreen());
         }
 
+        // 旋轉 90°（Screen Orientation API）
+        if (rotateBtn && screen.orientation) {
+            rotateBtn.addEventListener('click', () => {
+                try {
+                    const cur = screen.orientation.type;
+                    if (cur.startsWith('landscape')) {
+                        screen.orientation.lock('portrait-primary').catch(()=>{});
+                    } else {
+                        screen.orientation.lock('landscape-primary').catch(()=>{});
+                    }
+                } catch(e) {
+                    console.log('[Player] Orientation lock not supported');
+                }
+            });
+        } else if (rotateBtn) {
+            rotateBtn.style.display = 'none'; // not supported
+        }
+
         document.addEventListener('fullscreenchange', () => {
             if (document.fullscreenElement) {
-                // 進入全螢幕：隱藏控制列
                 if (ctrls) ctrls.classList.add('auto-hide');
             } else {
-                // 離開全螢幕：顯示控制列，隱藏疊層
                 if (ctrls) ctrls.classList.remove('auto-hide');
                 if (fso) fso.classList.remove('visible');
+                // 解鎖旋轉
+                if (screen.orientation) screen.orientation.unlock().catch(()=>{});
             }
         });
     }
