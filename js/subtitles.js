@@ -14,6 +14,12 @@ class SubtitleManager {
         this.hasMKVSubtitles = false;
         this.currentMKVTrack = null;
         this.currentSubtitleIndex = -1; // Track by index, not object reference
+        this.externalSources = [];      // [{name, subs}] — loaded .srt/.vtt files
+        this.currentExternal = -1;
+        this.panelOpen = false;
+        this.subtitleSearch = document.getElementById('subtitle-search');
+        this.subtitlePanel = document.getElementById('subtitle-panel');
+        this.subtitlePanelList = document.getElementById('subtitle-panel-list');
         this._debugCount = 0;
         this._rafId = null; // requestAnimationFrame handle
         
@@ -21,10 +27,36 @@ class SubtitleManager {
     }
 
     init() {
-        this.subtitleInput.addEventListener('change', (e) => {
+        this.subtitleInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
-                this.loadSubtitleFile(e.target.files[0]);
+                await this.loadSubtitleFiles([...e.target.files]);
+                e.target.value = '';
             }
+        });
+
+        // Subtitle picker panel (search by file name / track name)
+        const subBtn = document.getElementById('subtitle-btn');
+        if (subBtn) {
+            subBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.togglePanel();
+            });
+        }
+        const closeBtn = document.getElementById('subtitle-panel-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this.closePanel());
+        const loadBtn = document.getElementById('subtitle-load-btn');
+        if (loadBtn) loadBtn.addEventListener('click', () => this.subtitleInput.click());
+        if (this.subtitleSearch) {
+            this.subtitleSearch.addEventListener('input', () => this.renderPanel());
+        }
+        document.addEventListener('click', (e) => {
+            if (!this.panelOpen) return;
+            if (this.subtitlePanel && !this.subtitlePanel.contains(e.target) && e.target !== subBtn) {
+                this.closePanel();
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.panelOpen) this.closePanel();
         });
 
         // Use requestAnimationFrame for smooth, reliable subtitle updates
@@ -48,7 +80,10 @@ class SubtitleManager {
 
         // Handle track selection
         this.trackSelect.addEventListener('change', (e) => {
-            this.selectTrack(parseInt(e.target.value));
+            // Keep the raw value: option values may be numbers, 'mkv-N' or 'ext-N'
+            const v = e.target.value;
+            this.selectTrack(/^-?\d+$/.test(v) ? parseInt(v, 10) : v);
+            this.renderPanel();
         });
 
         // Listen for MKV file loaded
@@ -65,6 +100,8 @@ class SubtitleManager {
             
             if (tracks.length === 0) {
                 console.log('[Subtitles] No subtitle tracks found in MKV');
+                this.rebuildExternalOptions();
+                this.renderPanel();
                 return;
             }
 
@@ -86,10 +123,18 @@ class SubtitleManager {
             this.mkvTracks = tracks;
             this.hasMKVSubtitles = true;
 
-            // Auto-select first track
+            // Keep external files selectable, then refresh the search panel
+            this.rebuildExternalOptions();
+            this.renderPanel();
+
+            // Auto-select a "dialogue"-ish track when present, otherwise the first one
             if (tracks.length > 0) {
-                this.trackSelect.value = 'mkv-0';
-                this.selectTrack('mkv-0');
+                let pick = 0;
+                for (let i = 0; i < tracks.length; i++) {
+                    if (tracks[i].name && /dialogue|full|main|complete/i.test(tracks[i].name)) { pick = i; break; }
+                }
+                this.trackSelect.value = `mkv-${pick}`;
+                this.selectTrack(`mkv-${pick}`);
             }
 
             console.log(`[Subtitles] Loaded ${tracks.length} MKV subtitle track(s)`);
@@ -102,33 +147,148 @@ class SubtitleManager {
         }
     }
 
-    async loadSubtitleFile(file) {
-        const text = await file.text();
-        const ext = file.name.split('.').pop().toLowerCase();
-        
-        console.log(`[Subtitles] Loading external: ${file.name} (${ext})`);
-        
-        if (ext === 'srt') {
-            this.parseSRT(text);
-        } else if (ext === 'vtt') {
-            this.parseVTT(text);
-        } else {
-            console.error(`[Subtitles] Unsupported format: ${ext}`);
+    async loadSubtitleFiles(files) {
+        const loaded = [];
+        for (const file of files) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'srt' && ext !== 'vtt') {
+                console.error(`[Subtitles] Unsupported format: ${ext}`);
+                continue;
+            }
+            const text = await file.text();
+            const subs = [];
+            if (ext === 'srt') this.parseSRT(text, subs);
+            else this.parseVTT(text, subs);
+            if (subs.length === 0) continue;
+            this.externalSources.push({ name: file.name, subs });
+            loaded.push({ name: file.name, count: subs.length });
+            console.log(`[Subtitles] Loaded external: ${file.name} (${subs.length} entries)`);
+        }
+
+        if (loaded.length === 0) {
             alert('Unsupported subtitle format. Please use .srt or .vtt files.');
             return;
         }
-        
-        this.hasExternalSubtitles = true;
-        this.activeTrackIndex = -2; // Mark as external
-        
-        // Switch selector to external
-        this.trackSelect.value = '-2';
-        
-        console.log(`[Subtitles] Loaded ${this.subtitles.length} subtitle entries`);
-        
-        // Update info panel
+
+        this.rebuildExternalOptions();
+        // Mount the last file that was just added
+        const lastIdx = this.externalSources.length - 1;
+        this.mountExternal(lastIdx);
+        this.renderPanel();
+
         const subEl = document.getElementById('info-subtitles');
-        if (subEl) subEl.textContent = `${file.name} (${this.subtitles.length})`;
+        if (subEl) subEl.textContent = `${loaded[loaded.length - 1].name} (${loaded[loaded.length - 1].count})`;
+    }
+
+    // Rebuild the <option> list so external files stay selectable (and C-key cycle-able)
+    rebuildExternalOptions() {
+        // Drop old external options
+        [...this.trackSelect.querySelectorAll('option[data-kind="ext"]')].forEach(o => o.remove());
+        this.externalSources.forEach((src, i) => {
+            const opt = document.createElement('option');
+            opt.value = `ext-${i}`;
+            opt.dataset.kind = 'ext';
+            opt.textContent = `${src.name} [${src.subs.length}]`;
+            this.trackSelect.appendChild(opt);
+        });
+    }
+
+    mountExternal(index) {
+        const src = this.externalSources[index];
+        if (!src) return;
+        this.currentExternal = index;
+        this.subtitles = src.subs;
+        this.hasExternalSubtitles = true;
+        this.activeTrackIndex = -2;
+        this.currentMKVTrack = null;
+        this.currentSubtitle = null;
+        this.currentSubtitleIndex = -1;
+        this.trackSelect.value = `ext-${index}`;
+        const subEl = document.getElementById('info-subtitles');
+        if (subEl) subEl.textContent = `${src.name} (${src.subs.length})`;
+        console.log(`[Subtitles] Mounted external: ${src.name}`);
+    }
+
+    // ===== Subtitle picker panel =====
+    togglePanel() {
+        if (this.panelOpen) { this.closePanel(); return; }
+        this.panelOpen = true;
+        // Sit just above the control bar, whatever its height is
+        const controls = document.getElementById('controls');
+        if (this.subtitlePanel && controls && !controls.classList.contains('hidden')) {
+            this.subtitlePanel.style.bottom = (controls.offsetHeight + 14) + 'px';
+        }
+        if (this.subtitlePanel) this.subtitlePanel.classList.remove('hidden');
+        this.renderPanel();
+        if (this.subtitleSearch) {
+            this.subtitleSearch.value = '';
+            setTimeout(() => this.subtitleSearch.focus(), 50);
+        }
+    }
+
+    closePanel() {
+        this.panelOpen = false;
+        if (this.subtitlePanel) this.subtitlePanel.classList.add('hidden');
+    }
+
+    entries() {
+        const out = [{ value: '-1', label: 'CC Off', count: 0 }];
+        this.mkvTracks.forEach((t, i) => {
+            const lang = t.language && t.language !== 'und' ? ` (${t.language})` : '';
+            out.push({ value: `mkv-${i}`, label: `MKV: ${t.name || 'Track ' + (i + 1)}${lang}`, count: t.subtitles.length });
+        });
+        this.externalSources.forEach((src, i) => {
+            out.push({ value: `ext-${i}`, label: src.name, count: src.subs.length });
+        });
+        // Embedded (browser) text tracks
+        const tracks = this.player.video.textTracks;
+        for (let i = 0; i < tracks.length; i++) {
+            if (tracks[i].kind === 'subtitles' || tracks[i].kind === 'captions') {
+                out.push({ value: String(i), label: tracks[i].label || `Track ${i + 1}`, count: 0 });
+            }
+        }
+        return out;
+    }
+
+    renderPanel() {
+        if (!this.subtitlePanelList) return;
+        const q = (this.subtitleSearch && this.subtitleSearch.value || '').trim().toLowerCase();
+        const items = this.entries().filter(e => !q || e.label.toLowerCase().includes(q));
+        this.subtitlePanelList.innerHTML = '';
+        if (items.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'sub-item-empty';
+            empty.textContent = '冇符合嘅字幕';
+            this.subtitlePanelList.appendChild(empty);
+            return;
+        }
+        const current = this.trackSelect.value;
+        items.forEach(e => {
+            const btn = document.createElement('button');
+            btn.className = 'sub-item' + (e.value === current ? ' active' : '');
+            const name = document.createElement('span');
+            name.className = 'sub-item-name';
+            name.textContent = e.label;
+            btn.appendChild(name);
+            if (e.count) {
+                const cnt = document.createElement('span');
+                cnt.className = 'sub-item-count';
+                cnt.textContent = String(e.count);
+                btn.appendChild(cnt);
+            }
+            btn.addEventListener('click', () => {
+                this.trackSelect.value = e.value;
+                this.selectTrack(/^-?\d+$/.test(e.value) ? parseInt(e.value, 10) : e.value);
+                this.renderPanel();
+                if (typeof keyboard !== 'undefined' && keyboard.showOSD) keyboard.showOSD(`💬 ${e.label}`);
+                this.closePanel();
+            });
+            this.subtitlePanelList.appendChild(btn);
+        });
+    }
+
+    loadSubtitleFile(file) {
+        return this.loadSubtitleFiles([file]);
     }
 
     populateTrackSelector(tracks) {
@@ -148,6 +308,8 @@ class SubtitleManager {
         }
         
         console.log(`[Subtitles] Populated selector with ${this.trackSelect.options.length - 1} track(s)`);
+        this.rebuildExternalOptions();
+        this.renderPanel();
     }
 
     selectTrack(value) {
@@ -168,6 +330,9 @@ class SubtitleManager {
             // External file
             this.activeTrackIndex = -2;
             this.currentMKVTrack = null;
+        } else if (typeof value === 'string' && value.startsWith('ext-')) {
+            // External subtitle file
+            this.mountExternal(parseInt(value.split('-')[1], 10));
         } else if (typeof value === 'string' && value.startsWith('mkv-')) {
             // MKV track
             const trackIndex = parseInt(value.split('-')[1]);
@@ -183,10 +348,20 @@ class SubtitleManager {
             this.hasExternalSubtitles = false;
             console.log(`[Subtitles] Selected embedded track ${this.activeTrackIndex}`);
         }
+
+        // Keep the info panel in sync with the mounted track
+        const subEl = document.getElementById('info-subtitles');
+        if (subEl) {
+            if (this.activeTrackIndex === -3 && this.currentMKVTrack) {
+                subEl.textContent = `${this.currentMKVTrack.name || 'MKV'} (${this.currentMKVTrack.subtitles.length})`;
+            } else if (this.activeTrackIndex === -1) {
+                subEl.textContent = 'None';
+            }
+        }
     }
 
-    parseSRT(text) {
-        this.subtitles = [];
+    parseSRT(text, into) {
+        const target = into || (this.subtitles = []);
         const blocks = text.trim().split(/\n\s*\n/);
         
         blocks.forEach(block => {
@@ -211,7 +386,7 @@ class SubtitleManager {
                 );
                 const text = lines.slice(2).join('\n');
                 
-                this.subtitles.push({
+                target.push({
                     start: startTime,
                     end: endTime,
                     text: this.cleanSRTText(text)
@@ -220,8 +395,8 @@ class SubtitleManager {
         });
     }
 
-    parseVTT(text) {
-        this.subtitles = [];
+    parseVTT(text, into) {
+        const target = into || (this.subtitles = []);
         const lines = text.trim().split('\n');
         
         // Skip WEBVTT header
@@ -260,7 +435,7 @@ class SubtitleManager {
                     i++;
                 }
                 
-                this.subtitles.push({
+                target.push({
                     start: startTime,
                     end: endTime,
                     text: textLines.join('\n')

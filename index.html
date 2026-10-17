@@ -61,15 +61,17 @@
 
                 <div class="readme-section">
                     <h3>💬 Subtitles</h3>
-                    <p>Click <strong>💬</strong> to load <code>.srt</code> or <code>.vtt</code> files. MKV embedded subtitles are auto-detected.</p>
-                    <p>Use the <strong>CC dropdown</strong> to switch between subtitle tracks. Press <strong>V</strong> to cycle 10 subtitle styles.</p>
+                    <p>Click <strong>💬</strong> to open the subtitle picker: <strong>search by file name or track name</strong>, then click to mount it.</p>
+                    <p>Load one or several <code>.srt</code> / <code>.vtt</code> files at once (multi-select); every file stays available in the picker. MKV embedded subtitles (ASS/SRT) are auto-detected with their track names.</p>
+                    <p>Use the <strong>CC dropdown</strong> for quick switching, or press <strong>C</strong> to cycle. Press <strong>V</strong> to cycle 10 subtitle styles.</p>
                 </div>
 
                 <div class="readme-section">
                     <h3>🔊 Audio Tracks</h3>
                     <p>Movies with <strong>multiple audio tracks</strong> (dual audio, e.g. Cantonese + Mandarin) show a <strong>🎵 selector</strong> in the control bar once loaded.</p>
                     <p>MKV/MP4/MOV audio tracks are listed with language and codec. In Chrome/Edge/Firefox the selected track is extracted and played in sync (AAC / MP3 / Opus / FLAC). Safari switches tracks natively.</p>
-                    <p>Press <strong>A</strong> to cycle audio tracks. AC-3 / E-AC3 / DTS tracks are marked ⚠ — they cannot be decoded by the browser.</p>
+                    <p><strong>AC-3 / E-AC3 / DTS</strong> tracks are marked ⚙ and decoded in software by ffmpeg.wasm (loaded on demand, ~32MB the first time). A progress overlay shows the conversion; playback switches automatically when ready.</p>
+                    <p>Press <strong>A</strong> to cycle audio tracks.</p>
                 </div>
 
                 <div class="readme-section">
@@ -154,8 +156,8 @@
                     <span id="duration" class="time-display">00:00</span>
                 </div>
 
-                <!-- Control Buttons -->
-                <div class="controls-row">
+                <!-- Control Buttons — row 1: playback -->
+                <div class="controls-row controls-row-1">
                     <div class="controls-left">
                         <button id="play-btn" class="control-btn" title="Play/Pause (Space)">
                             <span class="icon">▶️</span>
@@ -189,12 +191,18 @@
                                 <option value="2.0">2.0x</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div class="controls-right">
                         <button id="fullscreen-btn" class="control-btn" title="Fullscreen (F)">
                             <span class="icon">⛶</span>
                         </button>
                     </div>
+                </div>
 
-                    <div class="controls-right">
+                <!-- Control Buttons — row 2: tracks & extras -->
+                <div class="controls-row controls-row-2">
+                    <div class="controls-left">
                         <div class="audio-track-selector">
                             <button id="audio-btn" class="control-btn" title="Audio Track (A)">
                                 <span class="icon">🎵</span>
@@ -203,15 +211,18 @@
                                 <option value="-1">Audio 1</option>
                             </select>
                         </div>
-                        <button id="subtitle-btn" class="control-btn" title="Load Subtitle File">
+                        <button id="subtitle-btn" class="control-btn" title="Subtitles — search or load (💬)">
                             <span class="icon">💬</span>
                         </button>
-                        <input type="file" id="subtitle-input" accept=".srt,.vtt" hidden>
+                        <input type="file" id="subtitle-input" accept=".srt,.vtt" multiple hidden>
                         <div class="subtitle-track-selector">
                             <select id="subtitle-track-select" class="subtitle-track-select" title="Embedded Subtitles">
                                 <option value="-1">CC Off</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div class="controls-right">
                         <button id="sub-style-btn" class="control-btn" title="Subtitle Style (V)">
                             <span class="icon">🔤</span>
                         </button>
@@ -259,6 +270,17 @@
                     <button class="sub-style-option" data-style="sub-theme-retro">Retro</button>
                     <button class="sub-style-option" data-style="sub-theme-dark">Dark</button>
                 </div>
+            </div>
+
+            <!-- Subtitle Picker (search by file name / track name) -->
+            <div id="subtitle-panel" class="subtitle-panel hidden">
+                <div class="subtitle-panel-head">
+                    <input id="subtitle-search" class="subtitle-search" type="search"
+                           placeholder="🔍 搜尋字幕檔名／軌名…" autocomplete="off" spellcheck="false">
+                    <button id="subtitle-panel-close" class="subtitle-panel-close" title="Close">✕</button>
+                </div>
+                <div id="subtitle-panel-list" class="subtitle-panel-list"></div>
+                <button id="subtitle-load-btn" class="subtitle-load-btn">＋ 載入字幕檔（可多選 .srt / .vtt）</button>
             </div>
         </div>
     </main>
@@ -344,14 +366,14 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-        <p>v2.8 — 2026-10-17</p>
+        <p>v2.9 — 2026-10-17</p>
     </footer>
 
-    <script src="js/player.js"></script>
-    <script src="js/mkv-extractor.js"></script>
-    <script src="js/audio-tracks.js"></script>
-    <script src="js/controls.js"></script>
-    <script src="js/subtitles.js"></script>
-    <script src="js/keyboard.js"></script>
+    <script src="js/player.js?v=2.9"></script>
+    <script src="js/mkv-extractor.js?v=2.9"></script>
+    <script src="js/audio-tracks.js?v=2.9"></script>
+    <script src="js/controls.js?v=2.9"></script>
+    <script src="js/subtitles.js?v=2.9"></script>
+    <script src="js/keyboard.js?v=2.9"></script>
 </body>
 </html>

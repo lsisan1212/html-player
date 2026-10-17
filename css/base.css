@@ -503,6 +503,18 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+}
+
+/* Two explicit rows: playback on top, tracks & extras below */
+.controls-row-1 {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.controls-row-2 {
+    padding-top: 0.125rem;
 }
 
 .controls-left,
@@ -511,6 +523,17 @@ body {
     display: flex;
     align-items: center;
     gap: 0.375rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.controls-left {
+    flex: 1 1 auto;
+}
+
+.controls-right {
+    flex: 0 0 auto;
+    justify-content: flex-end;
 }
 
 .controls-center {
@@ -639,7 +662,7 @@ body {
     font-size: 0.75rem;
     cursor: pointer;
     outline: none;
-    max-width: 110px;
+    max-width: 160px;
     transition: all 0.2s ease;
 }
 
@@ -668,7 +691,7 @@ body {
     font-size: 0.75rem;
     cursor: pointer;
     outline: none;
-    max-width: 130px;
+    max-width: 170px;
     transition: all 0.2s ease;
 }
 
@@ -689,17 +712,150 @@ body {
 /* Audio extraction progress (shown in OSD) */
 .audio-extract-progress {
     position: absolute;
-    bottom: 70px;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.85);
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    z-index: 100;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.88);
+    color: #fff;
+    padding: 1rem 1.4rem;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    z-index: 120;
     pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    text-align: center;
+    max-width: 80%;
+    line-height: 1.45;
+    backdrop-filter: blur(6px);
+}
+
+/* ===== Subtitle picker panel ===== */
+.subtitle-panel {
+    position: absolute;
+    right: 1rem;
+    bottom: 86px;
+    width: min(360px, 92vw);
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    z-index: 95;
+    overflow: hidden;
+}
+
+.subtitle-panel.hidden {
+    display: none;
+}
+
+.subtitle-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.subtitle-search {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.subtitle-search:focus {
+    border-color: var(--accent);
+}
+
+.subtitle-panel-close {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: 6px;
+}
+
+.subtitle-panel-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.subtitle-panel-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 0.25rem;
+}
+
+.sub-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    line-height: 1.3;
+}
+
+.sub-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.sub-item.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.sub-item .sub-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sub-item .sub-item-count {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    flex: 0 0 auto;
+}
+
+.sub-item-empty {
+    padding: 0.75rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.subtitle-load-btn {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    padding: 0.55rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.subtitle-load-btn:hover {
+    background: var(--accent);
+    color: #fff;
 }
 
 /* Theme Name Display */
@@ -1081,24 +1237,63 @@ body.is-pip .subtitle-container {
         gap: 0.5rem;
     }
 
-    /* 控制列改為 2 行，不滾動 */
+    /* 控制列：固定 2 行，圖示唔會被裁切 */
     .controls-row {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.25rem 0.4rem;
-        padding: 4px 2px;
+        justify-content: space-between;
+        flex-wrap: nowrap;
+        gap: 0.25rem;
+        padding: 2px 0;
     }
 
     .controls-left,
     .controls-right {
-        flex: 1 1 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-        padding: 3px 0;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        gap: 0.15rem;
+        padding: 2px 0;
+        min-width: 0;
     }
-    .controls-left { border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+    .controls-left { flex: 1 1 auto; }
+    .controls-right { flex: 0 0 auto; }
+    .controls-row-1 { border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+    .controls-row-2 { padding-top: 5px; }
     .controls-center { display: none; }
+
+    .control-btn {
+        padding: 0.22rem 0.3rem;
+        min-width: 26px;
+    }
+
+    .control-btn .icon {
+        font-size: 0.85rem;
+    }
+
+    .volume-slider {
+        width: 40px;
+    }
+    .volume-value { display: none; }
+    .speed-selector label { display: none; }
+    .speed-select {
+        font-size: 0.65rem;
+        padding: 1px 2px;
+        max-width: 54px;
+    }
+
+    .audio-track-select,
+    .subtitle-track-select {
+        font-size: 0.65rem;
+        padding: 0.22rem 0.3rem;
+    }
+    .audio-track-select { max-width: 104px; }
+    .subtitle-track-select { max-width: 92px; }
+    .theme-name { display: none; }
+
+    .subtitle-panel {
+        right: 0.5rem;
+        left: 0.5rem;
+        width: auto;
+        bottom: 96px;
+    }
 
     .control-btn {
         padding: 0.3rem 0.4rem;
@@ -1238,6 +1433,13 @@ body.is-pip .subtitle-container {
     .speed-selector select {
         max-width: 100%;
     }
+
+    /* 例外：控制列元素保持固定寬度，否則會互相重疊 */
+    .controls-row .audio-track-select { max-width: 104px !important; }
+    .controls-row .subtitle-track-select { max-width: 92px !important; }
+    .controls-row .control-btn { padding: 0.2rem 0.26rem !important; min-width: 24px !important; }
+    .controls-row .volume-slider { width: 36px !important; }
+    .controls-row .speed-select { max-width: 52px !important; }
 }
 
 /* ===== 2x 速度疊層 ===== */

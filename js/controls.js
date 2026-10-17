@@ -191,9 +191,7 @@ class ControlsHandler {
             this.player.takeScreenshot();
         });
 
-        document.getElementById('subtitle-btn').addEventListener('click', () => {
-            document.getElementById('subtitle-input').click();
-        });
+        // Subtitle button is handled by the subtitle picker panel (subtitles.js)
     }
 
     setupSubStyleControl() {
