@@ -1,89 +1,30 @@
-# HTML5 Player
+# HTML Player
 
-A feature-rich, zero-dependency HTML5 video player with multi-audio-track support (dual audio switching), MKV subtitle extraction, 10 themes, and keyboard shortcuts.
+單頁影片播放器，直接在任何瀏覽器播 **MKV / HEVC / AV1 / HDR**、多音軌、內嵌字幕 —— 唔需要轉檔、唔需要伺服器。
 
-## Features
+- 拖放或選檔即播
+- **暫停時畫面變灰階，繼續播放自動回復彩色**
+- 字幕：內嵌軌切換 + 「Add subtitle file…」外掛 `.srt` / `.vtt` / `.ass`
+- 鍵盤快捷鍵按 `?` 查看
 
-### Core Features
-- 🎬 **Drag & Drop** - Drop video files directly or click to open
-- ⚡ **Playback Speed** - 0.5x, 1.0x, 1.5x, 2.0x speed control
-- 💬 **Subtitle Support** - Load .srt/.vtt files or extract from MKV containers
-- 🎵 **Audio Tracks** - Select any audio track, including dual-audio MKV/MP4 (Cantonese + Mandarin); AC-3 / E-AC3 / DTS tracks are software-decoded via ffmpeg.wasm (lazy-loaded)
-- 🎨 **10 Themes** - Default, Dark, Light, Ocean, Forest, Sunset, Purple, Midnight, Neon, Minimal
-- 🔊 **Volume Control** - 0-100% volume range
-- ⏱️ **Seek Bar** - Click or drag to jump to any point in the video
-- ⌨️ **Keyboard Shortcuts** - Full keyboard control
+## 技術
 
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `Space` / `K` | Play/Pause |
-| `←` / `→` | Seek -5s / +5s |
-| `↑` / `↓` | Volume -10% / +10% |
-| `F` | Toggle Fullscreen |
-| `M` | Toggle Mute |
-| `L` | Toggle Loop |
-| `P` | Picture-in-Picture |
-| `S` | Take Screenshot |
-| `A` | Cycle audio tracks |
-| `C` | Cycle subtitle tracks |
-| `V` | Cycle subtitle theme (or click 🔤) |
-| `0-9` | Jump to 0%-90% of video |
-| `<` / `>` | Decrease/Increase speed |
-
-### Bonus Features
-- 🎵 Multi audio track switching (MKV/MP4/MOV, AAC/MP3/Opus/FLAC)
-- 📺 Picture-in-Picture mode
-- 📸 Screenshot capture
-- 🔁 Loop playback
-- 🖱️ Mouse wheel volume control
-- 🎯 OSD display for keyboard actions
-
-## Usage
-
-1. **Open the player**: Double-click `index.html` in your browser
-2. **Load a video**: Drag & drop a video file or click "Open Video"
-3. **Add subtitles**: Click the 💬 button and select a .srt or .vtt file
-4. **Change theme**: Click the 🎨 button and pick a theme
-5. **Control playback**: Use the controls bar or keyboard shortcuts
-
-## Project Structure
+播放引擎是 [Movi Player](https://github.com/MrUjjwalG/movi-player)（Apache-2.0）的 `element.slim` 建置：
+WebCodecs 硬解 + FFmpeg WASM 軟解，畫到 canvas；本頁只加了一層外殼（開檔 / 拖放 / 暫停灰階）。
 
 ```
-html5 player/
-├── index.html           # Main HTML file
-├── css/
-│   ├── base.css         # Core styles
-│   └── themes.css       # 10 theme definitions
-├── js/
-│   ├── player.js        # Core video player logic
-│   ├── controls.js      # UI controls handler
-│   ├── subtitles.js     # SRT/VTT subtitle parser
-│   ├── audio-tracks.js  # Audio track enumeration + switching
-│   └── keyboard.js      # Keyboard shortcut manager
-├── PLANS.md             # Implementation plan
-├── AGENTS.md            # Agent guidelines
-├── Makefile             # Harness validation
-└── docs/
-    └── ARCHITECTURE.md  # Architecture documentation
+vendor/movi/element.slim.global.js   # 預建置 web component（未修改）
+vendor/movi/movi.wasm                # FFmpeg 解碼器（5.3MB）
+vendor/movi/LICENSE                  # Apache-2.0
+css/site.css  js/site.js  index.html # 本頁外殼
 ```
 
-## Validation
+檔案的識別與播放全部在瀏覽器本機完成，不會上傳任何內容。
+
+## 更新引擎
 
 ```bash
-make smoke    # Quick validation
-make check    # Feature checks
-make ci       # Full validation
+npm pack movi-player@latest
+tar -xzf movi-player-*.tgz package/dist/element.slim.global.js package/dist/movi.wasm package/LICENSE
+cp package/dist/element.slim.global.js package/dist/movi.wasm package/LICENSE vendor/movi/
 ```
-
-## Browser Support
-
-Works in all modern browsers:
-- Chrome/Edge 80+
-- Firefox 75+
-- Safari 13+
-
-## License
-
-MIT

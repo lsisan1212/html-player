@@ -1,0 +1,17 @@
+HTML Player
+===========
+
+This static page bundles the prebuilt "slim" web component of Movi Player
+(https://github.com/MrUjjwalG/movi-player), which is licensed under the
+Apache License, Version 2.0 — see vendor/movi/LICENSE.
+
+Bundled, unmodified files:
+  vendor/movi/element.slim.global.js   movi-player v0.4.1 dist/element.slim.global.js
+  vendor/movi/movi.wasm                movi-player v0.4.1 dist/movi.wasm
+
+Original work Copyright (c) Ujjawal Kashyap.
+Modifications (page shell: file open/drag-drop, pause grayscale) are this
+repository's own, under the same license.
+
+Apache License 2.0 requires this notice plus the license text to travel with
+the distribution; both are in vendor/movi/.
