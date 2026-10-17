@@ -42,6 +42,70 @@ function isPlayableCodec(codec) {
     return ['AAC', 'MP3', 'Opus', 'FLAC', 'PCM'].indexOf(codec) !== -1;
 }
 
+// Codecs the browser can't decode natively but ffmpeg.wasm can (software decode)
+function isWasmCodec(codec) {
+    return ['AC-3', 'E-AC3', 'DTS'].indexOf(codec) !== -1;
+}
+
+// ===================== ffmpeg.wasm software decoder (AC-3 / E-AC3 / DTS) =====================
+// Runs inside a Blob worker: lazy-loads @ffmpeg/core (libav) from CDN, transcodes the
+// raw elementary stream (already extracted by mkv-extractor) into ADTS AAC, which then
+// plays through the normal extracted-audio pipeline.
+const FFMPEG_WORKER_SRC = `
+let corePromise = null;
+let curId = 0;
+const SOURCES = [
+    'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
+];
+function post(m, t) { self.postMessage(m, t || []); }
+
+async function loadCore() {
+    if (corePromise) return corePromise;
+    corePromise = (async () => {
+        let lastErr = null;
+        for (const url of SOURCES) {
+            try {
+                post({ id: curId, type: 'status', message: '正在載入解碼器（約 32MB，首次較慢）…' });
+                try { delete self.createFFmpegCore; } catch (e) { self.createFFmpegCore = undefined; }
+                self.importScripts(url);
+                const base = url.slice(0, url.lastIndexOf('/'));
+                const cfg = btoa(JSON.stringify({ wasmURL: base + '/ffmpeg-core.wasm' }));
+                return await createFFmpegCore({
+                    mainScriptUrlOrBlob: url + '#' + cfg
+                });
+            } catch (e) { lastErr = e; }
+        }
+        throw lastErr || new Error('無法載入解碼器');
+    })();
+    return corePromise;
+}
+
+self.onmessage = async (e) => {
+    const msg = e.data;
+    if (!msg || msg.cmd !== 'transcode') return;
+    curId = msg.id;
+    try {
+        const core = await loadCore();
+        const fmt = msg.codec === 'E-AC3' ? 'eac3' : (msg.codec === 'AC-3' ? 'ac3' : 'dts');
+        core.FS.writeFile('in.raw', new Uint8Array(msg.data));
+        core.setProgress(function (p) {
+            if (p && p.time && msg.durSec) {
+                post({ id: msg.id, type: 'progress', progress: Math.min(0.99, (p.time / 1000000) / msg.durSec) });
+            }
+        });
+        const ret = await core.exec('-f', fmt, '-i', 'in.raw', '-c:a', 'aac', '-b:a', msg.bitrate || '192k', '-f', 'adts', 'out.aac');
+        if (ret !== 0) throw new Error('ffmpeg 解碼失敗 (exit ' + ret + ')');
+        const out = core.FS.readFile('out.aac');
+        try { core.FS.unlink('in.raw'); } catch (e2) {}
+        try { core.FS.unlink('out.aac'); } catch (e2) {}
+        post({ id: msg.id, type: 'done', data: out.buffer }, [out.buffer]);
+    } catch (err) {
+        post({ id: msg.id, type: 'error', message: (err && err.message) || String(err) });
+    }
+};
+`;
+
 const LANG_NAMES = {
     yue: '粵', chi: '國', zho: '國', cmn: '國', eng: 'EN', jpn: '日', kor: '韓',
     tha: '泰', vie: '越', ind: '印尼', fra: '法', deu: '德', spa: '西', por: '葡',
@@ -676,6 +740,8 @@ class AudioTrackManager {
         this.file = null;
         this.progressEl = null;
         this._nativeVerifyTimer = null;
+        this._ffmpegWorker = null;
+        this._ffmpegJobSeq = 0;
 
         this.init();
     }
@@ -763,6 +829,7 @@ class AudioTrackManager {
                             codec: codec,
                             channels: t.channels || deriveChannels(codec, t.codecPrivate),
                             playable: isPlayableCodec(codec),
+                            wasm: isWasmCodec(codec),
                             raw: t
                         };
                     });
@@ -843,9 +910,11 @@ class AudioTrackManager {
             if (t.name) label += ` · ${t.name}`;
             if (t.codec) label += ` · ${t.codec}`;
             if (t.channels) label += ` ${t.channels}ch`;
-            if (!t.playable) {
+            if (!t.playable && !t.wasm) {
                 label += ' ⚠';
                 opt.className = 'unsupported';
+            } else if (t.wasm && !t.playable) {
+                label += ' ⚙';
             }
             opt.textContent = label;
             this.select.appendChild(opt);
@@ -889,7 +958,7 @@ class AudioTrackManager {
         }
 
         const t = this.tracks[index];
-        if (!t.playable) {
+        if (!t.playable && !t.wasm) {
             this.osd(`⚠ ${t.codec || 'This codec'} 不能被瀏覽器解碼`);
             this.restoreNative();
             if (this.select) this.select.value = String(this.defaultIndex);
@@ -953,6 +1022,21 @@ class AudioTrackManager {
                     if (big) throw new Error('big-endian PCM 未支援');
                     data = wrapWAV(frames, t.raw.channels, t.raw.samplingFrequency, t.raw.bitDepth, isFloat);
                     mime = 'audio/wav';
+                } else if (isWasmCodec(codec)) {
+                    // Software decode: raw elementary stream → ffmpeg.wasm → ADTS AAC
+                    const raw = concatU8(frames.map(f => f.data));
+                    const last = frames[frames.length - 1];
+                    const durSec = Math.max(1, (last.pts + (last.durMs || 0)) / 1000);
+                    const ch = t.raw.channels || 2;
+                    const bitrate = ch >= 6 ? '448k' : (ch >= 4 ? '256k' : '192k');
+                    const ab = await this.ffmpegTranscode(raw, codec, bitrate, durSec, (p, msg) => {
+                        if (token !== this.extractToken) return;
+                        if (msg) { this.showProgress(-1, msg); return; }
+                        this.showProgress(p, `🎵 軟件解碼 ${index + 1}（${codec}）… ${Math.round(p * 100)}%`);
+                    });
+                    if (token !== this.extractToken) return;
+                    data = new Uint8Array(ab);
+                    mime = 'audio/aac';
                 } else {
                     throw new Error(`${codec} 未支援萃取`);
                 }
@@ -1051,6 +1135,30 @@ class AudioTrackManager {
         if (Math.abs(diff) > 0.35) {
             try { this.audioEl.currentTime = v.currentTime; } catch (e) { /* ignore */ }
         }
+    }
+
+    // ===================== ffmpeg.wasm 軟解（AC-3 / E-AC3 / DTS） =====================
+    ffmpegTranscode(raw, codec, bitrate, durSec, onProgress) {
+        if (!this._ffmpegWorker) {
+            const blob = new Blob([FFMPEG_WORKER_SRC], { type: 'text/javascript' });
+            this._ffmpegWorker = new Worker(URL.createObjectURL(blob));
+        }
+        const w = this._ffmpegWorker;
+        const id = ++this._ffmpegJobSeq;
+        return new Promise((resolve, reject) => {
+            const cleanup = () => { clearTimeout(timer); w.removeEventListener('message', onMsg); };
+            const timer = setTimeout(() => { cleanup(); reject(new Error('軟件解碼逾時')); }, 15 * 60 * 1000);
+            const onMsg = (e) => {
+                const m = e.data;
+                if (!m || m.id !== id) return;
+                if (m.type === 'progress') { if (onProgress) onProgress(m.progress); }
+                else if (m.type === 'status') { if (onProgress) onProgress(-1, m.message); }
+                else if (m.type === 'done') { cleanup(); resolve(m.data); }
+                else if (m.type === 'error') { cleanup(); reject(new Error(m.message)); }
+            };
+            w.addEventListener('message', onMsg);
+            w.postMessage({ id, cmd: 'transcode', codec, data: raw.buffer, bitrate, durSec }, [raw.buffer]);
+        });
     }
 
     showProgress(p, text) {

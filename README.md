@@ -8,7 +8,7 @@ A feature-rich, zero-dependency HTML5 video player with multi-audio-track suppor
 - 🎬 **Drag & Drop** - Drop video files directly or click to open
 - ⚡ **Playback Speed** - 0.5x, 1.0x, 1.5x, 2.0x speed control
 - 💬 **Subtitle Support** - Load .srt/.vtt files or extract from MKV containers
-- 🎵 **Audio Tracks** - Select any audio track, including dual-audio MKV/MP4 (Cantonese + Mandarin)
+- 🎵 **Audio Tracks** - Select any audio track, including dual-audio MKV/MP4 (Cantonese + Mandarin); AC-3 / E-AC3 / DTS tracks are software-decoded via ffmpeg.wasm (lazy-loaded)
 - 🎨 **10 Themes** - Default, Dark, Light, Ocean, Forest, Sunset, Purple, Midnight, Neon, Minimal
 - 🔊 **Volume Control** - 0-100% volume range
 - ⏱️ **Seek Bar** - Click or drag to jump to any point in the video

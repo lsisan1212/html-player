@@ -13,6 +13,7 @@ class MKVSubtitleExtractor {
         this.TRACK_NUMBER = 0xD7;
         this.TRACK_TYPE = 0x83;
         this.TRACK_LANGUAGE = 0x22B59C;
+        this.TRACK_LANGUAGE_IETF = 0x22B59D;
         this.CODEC_ID = 0x86;
         this.NAME = 0x536E;
         this.CODEC_PRIVATE = 0x63A2;
@@ -605,6 +606,7 @@ class MKVSubtitleExtractor {
                         track.type = uint8[contentOffset];
                         break;
                     case this.TRACK_LANGUAGE:
+                    case this.TRACK_LANGUAGE_IETF:
                         track.language = this.readString(uint8, contentOffset, elemSize.value);
                         break;
                     case this.CODEC_ID:
