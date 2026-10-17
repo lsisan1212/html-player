@@ -87,18 +87,17 @@ self.onmessage = async (e) => {
     curId = msg.id;
     try {
         const core = await loadCore();
-        const fmt = msg.codec === 'E-AC3' ? 'eac3' : (msg.codec === 'AC-3' ? 'ac3' : 'dts');
-        core.FS.writeFile('in.raw', new Uint8Array(msg.data));
+        core.FS.writeFile('in.mkv', new Uint8Array(msg.data));
         core.setProgress(function (p) {
             if (p && p.time && msg.durSec) {
                 post({ id: msg.id, type: 'progress', progress: Math.min(0.99, (p.time / 1000000) / msg.durSec) });
             }
         });
-        const ret = await core.exec('-f', fmt, '-i', 'in.raw', '-c:a', 'aac', '-b:a', msg.bitrate || '192k', '-f', 'adts', 'out.aac');
+        const ret = await core.exec('-i', 'in.mkv', '-map', '0:a:0', '-vn', '-c:a', 'aac', '-b:a', msg.bitrate || '192k', '-movflags', '+faststart', 'out.m4a');
         if (ret !== 0) throw new Error('ffmpeg 解碼失敗 (exit ' + ret + ')');
-        const out = core.FS.readFile('out.aac');
-        try { core.FS.unlink('in.raw'); } catch (e2) {}
-        try { core.FS.unlink('out.aac'); } catch (e2) {}
+        const out = core.FS.readFile('out.m4a');
+        try { core.FS.unlink('in.mkv'); } catch (e2) {}
+        try { core.FS.unlink('out.m4a'); } catch (e2) {}
         post({ id: msg.id, type: 'done', data: out.buffer }, [out.buffer]);
     } catch (err) {
         post({ id: msg.id, type: 'error', message: (err && err.message) || String(err) });
@@ -742,6 +741,8 @@ class AudioTrackManager {
         this._nativeVerifyTimer = null;
         this._ffmpegWorker = null;
         this._ffmpegJobSeq = 0;
+        this.userMuted = false;        // user's mute intent (independent of video.muted)
+        this.extractedActive = false;   // an extracted track is currently playing
 
         this.init();
     }
@@ -762,7 +763,13 @@ class AudioTrackManager {
         v.addEventListener('waiting', () => { this.audioEl.pause(); });
         v.addEventListener('seeked', () => this.syncAudioTime(true));
         v.addEventListener('ratechange', () => { this.audioEl.playbackRate = v.playbackRate; });
-        v.addEventListener('volumechange', () => { this.audioEl.volume = v.volume; this.audioEl.muted = v.muted; });
+        // The video is force-muted while an extracted track is playing, so never
+        // mirror video.muted onto the sink — that would silence the real audio.
+        v.addEventListener('volumechange', () => {
+            this.audioEl.volume = v.volume;
+            if (!this.extractedActive) this.userMuted = v.muted;
+            this.audioEl.muted = this.userMuted;
+        });
         v.addEventListener('ended', () => { this.audioEl.pause(); });
 
         this.driftTimer = setInterval(() => this.driftCheck(), 300);
@@ -788,7 +795,9 @@ class AudioTrackManager {
         this.defaultIndex = 0;
         this.file = null;
         this.container = null;
-        this.player.video.muted = false;
+        this.extractedActive = false;
+        this.audioEl.muted = true;
+        this.player.video.muted = this.userMuted;
         this.hideProgress();
         if (this.select) {
             this.select.innerHTML = '<option value="-1">Audio 1</option>';
@@ -1023,20 +1032,27 @@ class AudioTrackManager {
                     data = wrapWAV(frames, t.raw.channels, t.raw.samplingFrequency, t.raw.bitDepth, isFloat);
                     mime = 'audio/wav';
                 } else if (isWasmCodec(codec)) {
-                    // Software decode: raw elementary stream → ffmpeg.wasm → ADTS AAC
-                    const raw = concatU8(frames.map(f => f.data));
+                    // Software decode: frames re-wrapped as a tiny Matroska file (keeps the
+                    // real block timecodes) → ffmpeg.wasm → ADTS AAC
                     const last = frames[frames.length - 1];
-                    const durSec = Math.max(1, (last.pts + (last.durMs || 0)) / 1000);
+                    const durSec = Math.max(1, (last.pts + (last.durMs || 32)) / 1000);
                     const ch = t.raw.channels || 2;
                     const bitrate = ch >= 6 ? '448k' : (ch >= 4 ? '256k' : '192k');
-                    const ab = await this.ffmpegTranscode(raw, codec, bitrate, durSec, (p, msg) => {
+                    const miniMkv = mkvExtractor.buildAudioMKV(frames, {
+                        codecId: t.raw.codecId,
+                        samplingFrequency: t.raw.samplingFrequency,
+                        channels: ch,
+                        bitDepth: t.raw.bitDepth,
+                        codecPrivate: t.raw.codecPrivate
+                    });
+                    const ab = await this.ffmpegTranscode(miniMkv, bitrate, durSec, (p, msg) => {
                         if (token !== this.extractToken) return;
                         if (msg) { this.showProgress(-1, msg); return; }
                         this.showProgress(p, `🎵 軟件解碼 ${index + 1}（${codec}）… ${Math.round(p * 100)}%`);
                     });
                     if (token !== this.extractToken) return;
                     data = new Uint8Array(ab);
-                    mime = 'audio/aac';
+                    mime = 'audio/mp4';
                 } else {
                     throw new Error(`${codec} 未支援萃取`);
                 }
@@ -1074,8 +1090,10 @@ class AudioTrackManager {
 
     applyExtracted(index, url) {
         const v = this.player.video;
-        v.muted = true;
+        this.extractedActive = true;
+        v.muted = true;                          // silence the native track
         this.audioEl.volume = v.volume;
+        this.audioEl.muted = this.userMuted;     // only mute if the user asked for it
         this.audioEl.playbackRate = v.playbackRate;
         const start = () => {
             try { this.audioEl.currentTime = v.currentTime; } catch (e) { /* not seekable yet */ }
@@ -1101,12 +1119,31 @@ class AudioTrackManager {
     }
 
     restoreNative() {
+        this.extractedActive = false;
         this.audioEl.pause();
         this.audioEl.removeAttribute('src');
         this.audioEl.load();
-        this.player.video.muted = false;
+        this.audioEl.muted = true;               // sink unused in native mode
+        this.player.video.muted = this.userMuted;
+        if (this.player.updateMuteIcon) {
+            this.player.updateMuteIcon(this.userMuted ? 0 : Math.round(this.player.video.volume * 100));
+        }
         this.osd('🎵 音軌 1（原生）');
         this.updateInfoLabel();
+    }
+
+    // Single entry point for mute intent (mute button / M key)
+    setUserMuted(m) {
+        this.userMuted = !!m;
+        if (this.extractedActive) {
+            this.audioEl.muted = this.userMuted;
+            this.player.video.muted = true;      // keep the native track silent
+        } else {
+            this.player.video.muted = this.userMuted;
+        }
+        if (this.player.updateMuteIcon) {
+            this.player.updateMuteIcon(this.userMuted ? 0 : Math.round(this.player.video.volume * 100));
+        }
     }
 
     onVideoPlay() {
@@ -1138,7 +1175,7 @@ class AudioTrackManager {
     }
 
     // ===================== ffmpeg.wasm 軟解（AC-3 / E-AC3 / DTS） =====================
-    ffmpegTranscode(raw, codec, bitrate, durSec, onProgress) {
+    ffmpegTranscode(input, bitrate, durSec, onProgress) {
         if (!this._ffmpegWorker) {
             const blob = new Blob([FFMPEG_WORKER_SRC], { type: 'text/javascript' });
             this._ffmpegWorker = new Worker(URL.createObjectURL(blob));
@@ -1157,7 +1194,7 @@ class AudioTrackManager {
                 else if (m.type === 'error') { cleanup(); reject(new Error(m.message)); }
             };
             w.addEventListener('message', onMsg);
-            w.postMessage({ id, cmd: 'transcode', codec, data: raw.buffer, bitrate, durSec }, [raw.buffer]);
+            w.postMessage({ id, cmd: 'transcode', data: input.buffer, bitrate, durSec }, [input.buffer]);
         });
     }
 

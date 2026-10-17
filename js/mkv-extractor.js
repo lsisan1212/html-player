@@ -1009,6 +1009,170 @@ class MKVSubtitleExtractor {
         }
         return str;
     }
+
+    // ===================== Minimal Matroska writer (audio only) =====================
+    // A raw AC-3/E-AC3/DTS elementary stream carries no timing metadata, so ffmpeg's
+    // raw demuxers assume a fixed frame size and stretch the timeline (E-AC3's
+    // 1536-sample frames become ~1.46x too long). Re-wrapping the extracted frames in
+    // a tiny Matroska container preserves the real block timecodes, so software decode
+    // stays in sync with the video.
+    buildAudioMKV(frames, meta) {
+        const ID = {
+            EBML: 0x1A45DFA3, EBMLVersion: 0x4286, EBMLReadVersion: 0x42F7,
+            EBMLMaxIDLength: 0x42F2, EBMLMaxSizeLength: 0x42F3,
+            DocType: 0x4282, DocTypeVersion: 0x4287, DocTypeReadVersion: 0x4285,
+            Segment: 0x18538067, Info: 0x1549A966, TimecodeScale: 0x2AD7B1,
+            MuxingApp: 0x4D80, WritingApp: 0x5741, Duration: 0x4489,
+            Tracks: 0x1654AE6B, TrackEntry: 0xAE, TrackNumber: 0xD7, TrackUID: 0x73C5,
+            TrackType: 0x83, FlagLacing: 0x9C, CodecID: 0x86, CodecPrivate: 0x63A2,
+            Audio: 0xE1, SamplingFrequency: 0xB5, Channels: 0x9F, BitDepth: 0x6264,
+            Cluster: 0x1F43B675, Timecode: 0xE7, SimpleBlock: 0xA3
+        };
+
+        const idBytes = (id) => {
+            const out = [];
+            let v = id;
+            while (v > 0) { out.unshift(v & 0xFF); v = Math.floor(v / 256); }
+            return new Uint8Array(out);
+        };
+
+        const sizeBytes = (size) => {
+            let len = 1;
+            while (len < 8 && size >= Math.pow(2, 7 * len) - 1) len++;
+            const out = new Uint8Array(len);
+            let val = size;
+            for (let i = len - 1; i >= 0; i--) { out[i] = val & 0xFF; val = Math.floor(val / 256); }
+            out[0] |= (1 << (8 - len));
+            return out;
+        };
+
+        const concat = (parts) => {
+            let total = 0;
+            for (const p of parts) total += p.length;
+            const out = new Uint8Array(total);
+            let off = 0;
+            for (const p of parts) { out.set(p, off); off += p.length; }
+            return out;
+        };
+
+        const elem = (id, payload) => {
+            const i = idBytes(id), s = sizeBytes(payload.length);
+            const out = new Uint8Array(i.length + s.length + payload.length);
+            out.set(i, 0); out.set(s, i.length); out.set(payload, i.length + s.length);
+            return out;
+        };
+
+        const uintElem = (id, value) => {
+            const bytes = [];
+            let v = Math.max(0, Math.floor(value));
+            do { bytes.unshift(v & 0xFF); v = Math.floor(v / 256); } while (v > 0);
+            return elem(id, new Uint8Array(bytes));
+        };
+
+        const strElem = (id, s) => {
+            const b = new Uint8Array(s.length);
+            for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+            return elem(id, b);
+        };
+
+        const floatElem = (id, f) => {
+            const b = new Uint8Array(8);
+            new DataView(b.buffer).setFloat64(0, f, false);
+            return elem(id, b);
+        };
+
+        const header = elem(ID.EBML, concat([
+            uintElem(ID.EBMLVersion, 1),
+            uintElem(ID.EBMLReadVersion, 1),
+            uintElem(ID.EBMLMaxIDLength, 4),
+            uintElem(ID.EBMLMaxSizeLength, 8),
+            strElem(ID.DocType, 'matroska'),
+            uintElem(ID.DocTypeVersion, 4),
+            uintElem(ID.DocTypeReadVersion, 2)
+        ]));
+
+        const audioMeta = concat([
+            floatElem(ID.SamplingFrequency, meta.samplingFrequency || 48000),
+            uintElem(ID.Channels, meta.channels || 2),
+            meta.bitDepth ? uintElem(ID.BitDepth, meta.bitDepth) : new Uint8Array(0)
+        ]);
+
+        const trackChildren = [
+            uintElem(ID.TrackNumber, 1),
+            uintElem(ID.TrackUID, 1),
+            uintElem(ID.TrackType, 2),            // 2 = audio
+            uintElem(ID.FlagLacing, 0),
+            strElem(ID.CodecID, meta.codecId || 'A_EAC3'),
+            elem(ID.Audio, audioMeta)
+        ];
+        if (meta.codecPrivate && meta.codecPrivate.length > 0) {
+            trackChildren.push(elem(ID.CodecPrivate, meta.codecPrivate));
+        }
+        const tracks = elem(ID.Tracks, elem(ID.TrackEntry, concat(trackChildren)));
+
+        // Frames inside one laced block share the block's timecode, so pts alone are
+        // not monotonic. Rebuild the timeline from each frame's real sample count.
+        const frameMs = (data) => {
+            const c = (meta.codecId || '').toUpperCase();
+            if (c.indexOf('A_EAC3') === 0 && data.length >= 5 && data[0] === 0x0B && data[1] === 0x77) {
+                const fscod = (data[4] >> 6) & 0x03;
+                const sr = fscod === 0 ? 48000 : (fscod === 1 ? 44100 : (fscod === 2 ? 32000 : 48000));
+                const nblk = (data[4] >> 4) & 0x03;
+                const blocks = nblk === 3 ? 6 : nblk + 1;
+                return (blocks * 256) / sr * 1000;
+            }
+            if (c.indexOf('A_AC3') === 0) return 32;     // AC-3: fixed 1536 samples @48k
+            return 0;                                     // unknown → caller falls back
+        };
+
+        let accumMs = 0;
+        const times = new Array(frames.length);
+        for (let i = 0; i < frames.length; i++) {
+            times[i] = Math.round(accumMs);
+            const ms = frameMs(frames[i].data) || frames[i].durMs || 32;
+            accumMs += ms;
+        }
+
+        const lastFrame = frames[frames.length - 1] || { pts: 0, durMs: 0 };
+        const durationMs = Math.max(accumMs, lastFrame.pts + (lastFrame.durMs || 32));
+        const info = elem(ID.Info, concat([
+            uintElem(ID.TimecodeScale, 1000000),
+            strElem(ID.MuxingApp, 'html-player'),
+            strElem(ID.WritingApp, 'html-player'),
+            floatElem(ID.Duration, durationMs)
+        ]));
+
+        // Clusters: cut at ~30s or ~4MB so SimpleBlock relative timecodes stay in int16
+        const clusters = [];
+        let cur = null;
+        for (let i = 0; i < frames.length; i++) {
+            const f = frames[i];
+            const pts = times[i];
+            if (!cur || pts - cur.base > 30000 || cur.size > 4 * 1024 * 1024) {
+                if (cur) clusters.push(cur);
+                cur = { base: pts, parts: [], size: 0 };
+            }
+            let rel = pts - cur.base;
+            if (rel > 32767) rel = 32767;
+            if (rel < -32768) rel = -32768;
+            const block = new Uint8Array(4 + f.data.length);
+            block[0] = 0x81;                       // track number 1 (vint)
+            block[1] = (rel >> 8) & 0xFF;          // int16 BE
+            block[2] = rel & 0xFF;
+            block[3] = 0x80;                       // keyframe flag
+            block.set(f.data, 4);
+            cur.parts.push(elem(ID.SimpleBlock, block));
+            cur.size += block.length;
+        }
+        if (cur) clusters.push(cur);
+
+        const clusterParts = clusters.map(c => elem(ID.Cluster, concat(
+            [uintElem(ID.Timecode, c.base)].concat(c.parts)
+        )));
+
+        const segment = elem(ID.Segment, concat([info, tracks].concat(clusterParts)));
+        return concat([header, segment]);
+    }
 }
 
 const mkvExtractor = new MKVSubtitleExtractor();

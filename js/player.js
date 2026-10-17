@@ -247,14 +247,22 @@ class VideoPlayer {
     }
 
     toggleMute() {
-        this.video.muted = !this.video.muted;
-        this.updateMuteIcon(this.video.muted ? 0 : parseFloat(document.getElementById('volume-slider').value));
+        const extracted = typeof audioTracks !== 'undefined' && audioTracks && audioTracks.extractedActive;
+        const next = extracted ? !audioTracks.userMuted : !this.video.muted;
+        if (typeof audioTracks !== 'undefined' && audioTracks && audioTracks.setUserMuted) {
+            audioTracks.setUserMuted(next);
+        } else {
+            this.video.muted = next;
+        }
+        this.updateMuteIcon(next ? 0 : parseFloat(document.getElementById('volume-slider').value));
     }
 
     updateMuteIcon(volume) {
         const muteBtn = document.getElementById('mute-btn');
         const icon = muteBtn.querySelector('.icon');
-        if (volume === 0 || this.video.muted) {
+        const extracted = typeof audioTracks !== 'undefined' && audioTracks && audioTracks.extractedActive;
+        const isMuted = extracted ? audioTracks.userMuted : this.video.muted;
+        if (volume === 0 || isMuted) {
             icon.textContent = '🔇';
         } else if (volume < 50) {
             icon.textContent = '🔉';
