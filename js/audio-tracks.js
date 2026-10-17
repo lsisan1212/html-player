@@ -832,12 +832,7 @@ class AudioTrackManager {
 
     populateUI() {
         if (!this.select) return;
-        if (this.nativeMode && this._nativeDone) return; // native list wins
-        if (this.tracks.length <= 1) {
-            this.showSelector(false);
-            return;
-        }
-        this.showSelector(true);
+        this.showSelector(this.tracks.length > 1);
         this.select.innerHTML = '';
         for (const t of this.tracks) {
             const opt = document.createElement('option');
