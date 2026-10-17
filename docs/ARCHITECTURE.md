@@ -1,4 +1,4 @@
-# HTML5 AI Player - Architecture
+# HTML5 Player - Architecture
 
 ## Overview
 A standalone HTML5 video player with theme support, subtitle rendering, and keyboard shortcuts. No external dependencies - pure HTML/CSS/JavaScript.
@@ -84,6 +84,7 @@ Themes use CSS custom properties (CSS variables) defined in `:root` scope. Each 
 | L | Loop toggle |
 | P | Picture-in-Picture |
 | S | Screenshot |
+| A | Cycle audio tracks |
 | 0-9 | Jump to 0%-90% |
 | </> | Speed down/up |
 
@@ -98,6 +99,7 @@ html5 player/
 │   ├── player.js        # VideoPlayer class
 │   ├── controls.js      # ControlsHandler class
 │   ├── subtitles.js     # SubtitleManager class
+│   ├── audio-tracks.js  # AudioTrackManager class
 │   └── keyboard.js      # KeyboardManager class
 ├── PLANS.md             # Implementation plan
 ├── AGENTS.md            # Agent guidelines

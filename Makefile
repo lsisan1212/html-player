@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .PHONY: smoke check ci audit clean
 
-# HTML5 AI Player - Harness Engineering Makefile
+# HTML5 Player - Harness Engineering Makefile
 
 ## Smoke Test - Quick validation
 smoke:
@@ -15,6 +15,7 @@ smoke:
 	@test -f js/subtitles.js && echo "✓ subtitles.js exists" || (echo "✗ subtitles.js missing" && exit 1)
 	@test -f js/keyboard.js && echo "✓ keyboard.js exists" || (echo "✗ keyboard.js missing" && exit 1)
 	@test -f js/mkv-extractor.js && echo "✓ mkv-extractor.js exists" || (echo "✗ mkv-extractor.js missing" && exit 1)
+	@test -f js/audio-tracks.js && echo "✓ audio-tracks.js exists" || (echo "✗ audio-tracks.js missing" && exit 1)
 	@echo ""
 	@echo "Validating HTML structure..."
 	@grep -q '<video' index.html && echo "✓ Video element found" || (echo "✗ Video element missing" && exit 1)
@@ -37,6 +38,7 @@ check: smoke
 	@grep -q 'class ControlsHandler' js/controls.js && echo "✓ ControlsHandler class" || (echo "✗ ControlsHandler missing" && exit 1)
 	@grep -q 'class SubtitleManager' js/subtitles.js && echo "✓ SubtitleManager class" || (echo "✗ SubtitleManager missing" && exit 1)
 	@grep -q 'class KeyboardManager' js/keyboard.js && echo "✓ KeyboardManager class" || (echo "✗ KeyboardManager missing" && exit 1)
+	@grep -q 'class AudioTrackManager' js/audio-tracks.js && echo "✓ AudioTrackManager class" || (echo "✗ AudioTrackManager missing" && exit 1)
 	@echo ""
 	@echo "Checking required features..."
 	@grep -q 'dragover' js/player.js && echo "✓ Drag & drop" || (echo "✗ Drag & drop missing" && exit 1)
@@ -56,6 +58,7 @@ ci: check
 	@node -c js/player.js 2>/dev/null && echo "✓ player.js syntax" || echo "⚠ player.js syntax check skipped (node not available)"
 	@node -c js/controls.js 2>/dev/null && echo "✓ controls.js syntax" || echo "⚠ controls.js syntax check skipped (node not available)"
 	@node -c js/subtitles.js 2>/dev/null && echo "✓ subtitles.js syntax" || echo "⚠ subtitles.js syntax check skipped (node not available)"
+	@node -c js/audio-tracks.js 2>/dev/null && echo "✓ audio-tracks.js syntax" || echo "⚠ audio-tracks.js syntax check skipped (node not available)"
 	@node -c js/keyboard.js 2>/dev/null && echo "✓ keyboard.js syntax" || echo "⚠ keyboard.js syntax check skipped (node not available)"
 	@echo ""
 	@echo "=== CI Pipeline Passed ==="

@@ -1,6 +1,6 @@
-# HTML5 AI Player
+# HTML5 Player
 
-A feature-rich, zero-dependency HTML5 video player with AI commentator, 10 themes, subtitle support, and keyboard shortcuts.
+A feature-rich, zero-dependency HTML5 video player with multi-audio-track support (dual audio switching), MKV subtitle extraction, 10 themes, and keyboard shortcuts.
 
 ## Features
 
@@ -8,6 +8,7 @@ A feature-rich, zero-dependency HTML5 video player with AI commentator, 10 theme
 - 🎬 **Drag & Drop** - Drop video files directly or click to open
 - ⚡ **Playback Speed** - 0.5x, 1.0x, 1.5x, 2.0x speed control
 - 💬 **Subtitle Support** - Load .srt/.vtt files or extract from MKV containers
+- 🎵 **Audio Tracks** - Select any audio track, including dual-audio MKV/MP4 (Cantonese + Mandarin)
 - 🎨 **10 Themes** - Default, Dark, Light, Ocean, Forest, Sunset, Purple, Midnight, Neon, Minimal
 - 🔊 **Volume Control** - 0-100% volume range
 - ⏱️ **Seek Bar** - Click or drag to jump to any point in the video
@@ -25,14 +26,14 @@ A feature-rich, zero-dependency HTML5 video player with AI commentator, 10 theme
 | `L` | Toggle Loop |
 | `P` | Picture-in-Picture |
 | `S` | Take Screenshot |
-| `A` | Open AI Commentator menu |
+| `A` | Cycle audio tracks |
 | `C` | Cycle subtitle tracks |
 | `V` | Cycle subtitle theme (or click 🔤) |
 | `0-9` | Jump to 0%-90% of video |
 | `<` / `>` | Decrease/Increase speed |
 
 ### Bonus Features
-- 🤖 Multi-lingual AI Commentator (EN/ZH-TW/YUE/JA/KO/TH)
+- 🎵 Multi audio track switching (MKV/MP4/MOV, AAC/MP3/Opus/FLAC)
 - 📺 Picture-in-Picture mode
 - 📸 Screenshot capture
 - 🔁 Loop playback
@@ -59,6 +60,7 @@ html5 player/
 │   ├── player.js        # Core video player logic
 │   ├── controls.js      # UI controls handler
 │   ├── subtitles.js     # SRT/VTT subtitle parser
+│   ├── audio-tracks.js  # Audio track enumeration + switching
 │   └── keyboard.js      # Keyboard shortcut manager
 ├── PLANS.md             # Implementation plan
 ├── AGENTS.md            # Agent guidelines

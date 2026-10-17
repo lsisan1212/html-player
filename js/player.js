@@ -115,6 +115,9 @@ class VideoPlayer {
             this.video.play().catch(() => {});
         }, 100);
 
+        // Dispatch generic file event (audio track enumeration)
+        document.dispatchEvent(new CustomEvent('videofile', { detail: { file } }));
+
         // If MKV, dispatch event for subtitle extraction
         if (file.name.toLowerCase().endsWith('.mkv')) {
             console.log('[Player] MKV detected, extracting subtitles...');

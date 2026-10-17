@@ -1,5 +1,6 @@
 // MKV Subtitle Extractor v2
 // Parses MKV/Matroska files to extract embedded subtitle tracks
+// Also provides audio track enumeration + extraction (for dual-audio switching)
 class MKVSubtitleExtractor {
     constructor() {
         // EBML Element IDs (hex)
@@ -14,120 +15,56 @@ class MKVSubtitleExtractor {
         this.TRACK_LANGUAGE = 0x22B59C;
         this.CODEC_ID = 0x86;
         this.NAME = 0x536E;
+        this.CODEC_PRIVATE = 0x63A2;
+        this.AUDIO_ELEMENT = 0xE1;
+        this.VIDEO_ELEMENT = 0xE0;
+        this.AUDIO_SAMPLING_FREQUENCY = 0xB5;
+        this.AUDIO_CHANNELS = 0xE1;
+        this.AUDIO_BIT_DEPTH = 0x6264;
+        this.AUDIO_BLOCK_ALIGNMENT = 0x9F;
         this.CLUSTER = 0x1F43B675;
         this.CLUSTER_TIMECODE = 0xE7;
         this.SIMPLE_BLOCK = 0xA3;
         this.BLOCK_GROUP = 0xA0;
         this.BLOCK = 0xA1;
         this.BLOCK_DURATION = 0x9B;
+        this.CODEC_DELAY = 0x56AA; // nanoseconds; ffmpeg subtracts it from block pts
     }
 
     async extractSubtitles(file) {
         console.log(`[MKV] === Starting extraction ===`);
         console.log(`[MKV] File: ${file.name}, Size: ${(file.size / 1024 / 1024).toFixed(1)} MB`);
-        
+
         try {
-            // Read first 2MB for header/tracks, then stream clusters
-            const headerBuffer = await file.slice(0, 2 * 1024 * 1024).arrayBuffer();
-            const header = new Uint8Array(headerBuffer);
-            
-            // Verify MKV signature
-            if (header[0] !== 0x1A || header[1] !== 0x45 || header[2] !== 0xDF || header[3] !== 0xA3) {
+            const parsed = await this.parseTracksHeader(file);
+            if (!parsed) {
                 console.log('[MKV] Not a valid MKV file (bad signature)');
                 return [];
             }
 
-            let offset = 4;
-            
-            // Skip EBML header
-            const ebmlSize = this.readVarInt(header, offset);
-            if (!ebmlSize) { console.log('[MKV] Failed to read EBML header size'); return []; }
-            offset += ebmlSize.length + ebmlSize.value;
-            console.log(`[MKV] EBML header OK, offset now: ${offset}`);
+            let timecodeScale = parsed.timecodeScale;
+            const tracks = parsed.tracks;
+            const clusterStart = parsed.clusterStart;
 
-            // Find segment
-            const segId = this.readElementID(header, offset);
-            if (!segId) { console.log('[MKV] Failed to read segment ID'); return []; }
-            console.log(`[MKV] Segment ID: 0x${segId.value.toString(16).toUpperCase()}`);
-            
-            if (segId.value !== this.SEGMENT) {
-                console.log('[MKV] No segment found');
-                return [];
-            }
-            offset += segId.length;
-            
-            const segSize = this.readVarInt(header, offset);
-            if (!segSize) { console.log('[MKV] Failed to read segment size'); return []; }
-            offset += segSize.length;
-            
-            // 0x01FFFFFFFFFFFFFF = unknown size (read until EOF)
-            const UNKNOWN_SIZE = 0x01FFFFFFFFFFFFFF;
-            const isUnknownSize = segSize.value === UNKNOWN_SIZE;
-            
-            if (isUnknownSize) {
-                console.log(`[MKV] Segment size: unknown (will read full file)`);
-            } else {
-                console.log(`[MKV] Segment size: ${segSize.value}`);
-            }
-
-            // Parse header elements (SegmentInfo + Tracks)
-            let timecodeScale = 1000000; // Default 1ms in nanoseconds
-            const tracks = [];
-            let scanOffset = offset;
-            let foundCluster = false;
-            const segmentEnd = isUnknownSize ? header.length : Math.min(offset + segSize.value, header.length);
-
-            while (scanOffset < segmentEnd && scanOffset < header.length - 4 && !foundCluster) {
-                const elemId = this.readElementID(header, scanOffset);
-                if (!elemId) break;
-                
-                const idLen = elemId.length;
-                const sizeOffset = scanOffset + idLen;
-                const elemSize = this.readVarInt(header, sizeOffset);
-                if (!elemSize) break;
-                
-                const contentOffset = sizeOffset + elemSize.length;
-                const elemEnd = contentOffset + elemSize.value;
-
-                if (elemId.value === this.TIMECODE_SCALE && elemSize.value <= 8) {
-                    timecodeScale = this.readUInt(header, contentOffset, elemSize.value);
-                    console.log(`[MKV] TimecodeScale: ${timecodeScale}ns`);
-                }
-
-                if (elemId.value === this.TRACKS) {
-                    console.log(`[MKV] Found Tracks element at ${scanOffset}`);
-                    this.parseTracks(header, contentOffset, Math.min(elemEnd, header.length), tracks);
-                    console.log(`[MKV] Parsed ${tracks.length} total track(s), ${tracks.filter(t => t.type === 17).length} subtitle(s)`);
-                }
-
-                if (elemId.value === this.CLUSTER) {
-                    foundCluster = true;
-                    console.log(`[MKV] Found first Cluster at ${scanOffset}`);
-                }
-
-                scanOffset = elemEnd;
-            }
+            console.log(`[MKV] TimecodeScale: ${timecodeScale}ns`);
+            console.log(`[MKV] Parsed ${tracks.length} total track(s), ${tracks.filter(t => t.type === 17).length} subtitle(s)`);
 
             const subtitleTracks = tracks.filter(t => t.type === 17);
-            
+
             if (subtitleTracks.length === 0) {
                 console.log('[MKV] No subtitle tracks found in header');
                 console.log('[MKV] All tracks:', tracks.map(t => `#${t.number} type=${t.type} codec=${t.codecId} lang=${t.language}`));
                 return [];
             }
 
-            // Now extract subtitle data from the full file using chunked reading
-            console.log(`[MKV] Extracting ${subtitleTracks.length} subtitle track(s)...`);
-
-            // Find cluster start offset from header
-            const headerEnd = Math.min(offset + 2 * 1024 * 1024, header.length);
-            const clusterOffset = this.findClusterOffset(header, offset, headerEnd);
-            if (clusterOffset === -1) {
+            if (clusterStart === -1) {
                 console.log('[MKV] No clusters found in header');
                 return [];
             }
 
-            console.log(`[MKV] First cluster at offset: ${clusterOffset}`);
+            // Now extract subtitle data from the full file using chunked reading
+            console.log(`[MKV] Extracting ${subtitleTracks.length} subtitle track(s)...`);
+            console.log(`[MKV] First cluster at offset: ${clusterStart}`);
 
             // Read file in chunks to handle large files
             const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB per chunk
@@ -142,7 +79,7 @@ class MKVSubtitleExtractor {
                 subtitles: []
             }));
 
-            let fileOffset = clusterOffset;
+            let fileOffset = clusterStart;
             let totalClusters = 0;
             let chunkNum = 0;
 
@@ -233,6 +170,360 @@ class MKVSubtitleExtractor {
         }
     }
 
+    // ===== Audio track support (dual-audio switching) =====
+
+    // Parse only the header (EBML + SegmentInfo + Tracks) and locate first cluster.
+    // Uses a sliding window so huge top-level elements (e.g. multi-MB Attachments)
+    // between SegmentInfo and Clusters don't break the walk — we simply seek past them.
+    async parseTracksHeader(file) {
+        const WINDOW = 2 * 1024 * 1024;
+        const TRACKS_LIMIT = 16 * 1024 * 1024; // Tracks element larger than this is pathological
+
+        let win = new Uint8Array(await file.slice(0, Math.min(WINDOW, file.size)).arrayBuffer());
+        let winBase = 0; // absolute file offset of win[0]
+
+        if (win.length < 4 || win[0] !== 0x1A || win[1] !== 0x45 || win[2] !== 0xDF || win[3] !== 0xA3) {
+            return null; // not MKV/WebM
+        }
+
+        // Ensure the window covers absolute range [absPos, absPos + need).
+        // Re-reads a fresh window when the needed range falls outside the current one.
+        const ensure = async (absPos, need) => {
+            if (absPos >= winBase && absPos + need <= winBase + win.length) return true;
+            const size = Math.min(Math.max(need, WINDOW), file.size - absPos);
+            if (size < need) return false;
+            win = new Uint8Array(await file.slice(absPos, absPos + size).arrayBuffer());
+            winBase = absPos;
+            return true;
+        };
+
+        let offset = 4;
+        if (!(await ensure(offset, 12))) return null;
+        const ebmlSize = this.readVarInt(win, offset - winBase);
+        if (!ebmlSize) return null;
+        offset += ebmlSize.length + ebmlSize.value;
+
+        if (!(await ensure(offset, 16))) return null;
+        const segId = this.readElementID(win, offset - winBase);
+        if (!segId || segId.value !== this.SEGMENT) return null;
+        offset += segId.length;
+
+        const segSize = this.readVarInt(win, offset - winBase);
+        if (!segSize) return null;
+        offset += segSize.length;
+
+        const UNKNOWN_SIZE = 0x01FFFFFFFFFFFFFF;
+        const isUnknownSize = segSize.value === UNKNOWN_SIZE;
+
+        let timecodeScale = 1000000;
+        const tracks = [];
+        let clusterStart = -1;
+        const segmentEnd = isUnknownSize ? file.size : Math.min(offset + segSize.value, file.size);
+
+        let scan = offset;
+        while (scan < segmentEnd - 4) {
+            if (!(await ensure(scan, 16))) break;
+            const rel = scan - winBase;
+
+            const elemId = this.readElementID(win, rel);
+            if (!elemId) break;
+
+            const elemSize = this.readVarInt(win, rel + elemId.length);
+            if (!elemSize) break;
+
+            const contentAbs = scan + elemId.length + elemSize.length;
+            const elemEndAbs = contentAbs + elemSize.value;
+
+            if (elemId.value === this.TIMECODE_SCALE && elemSize.value <= 8) {
+                if (!(await ensure(contentAbs, elemSize.value))) break;
+                timecodeScale = this.readUInt(win, contentAbs - winBase, elemSize.value);
+            } else if (elemId.value === this.TRACKS) {
+                const need = Math.min(elemSize.value, TRACKS_LIMIT);
+                if (await ensure(contentAbs, need)) {
+                    const endRel = Math.min(contentAbs - winBase + elemSize.value, win.length);
+                    this.parseTracks(win, contentAbs - winBase, endRel, tracks);
+                } else {
+                    console.warn('[MKV] Tracks element too large to buffer, skipping');
+                }
+            } else if (elemId.value === this.CLUSTER) {
+                clusterStart = scan;
+                break;
+            }
+
+            // Seek to the next top-level element — huge elements (Attachments,
+            // Cues, Tags...) are skipped without being read.
+            scan = elemEndAbs;
+        }
+
+        return { tracks, timecodeScale, clusterStart, isWebM: false };
+    }
+
+    // List audio tracks (type=2) with codec info
+    async enumerateAudioTracks(file) {
+        const parsed = await this.parseTracksHeader(file);
+        if (!parsed) return null;
+        return parsed.tracks
+            .filter(t => t.type === 2)
+            .map(t => ({
+                number: t.number,
+                language: t.language,
+                name: t.name,
+                codecId: t.codecId,
+                codecPrivate: t.codecPrivate,
+                samplingFrequency: t.samplingFrequency,
+                channels: t.channels,
+                bitDepth: t.bitDepth
+            }));
+    }
+
+    // Extract all frames of one audio track. Returns [{data: Uint8Array, pts: ms}]
+    async extractAudioTrack(file, trackNumber, onProgress) {
+        const parsed = await this.parseTracksHeader(file);
+        if (!parsed || parsed.clusterStart === -1) return [];
+
+        const { timecodeScale, clusterStart } = parsed;
+        const frames = [];
+
+        const CHUNK_SIZE = 64 * 1024 * 1024;
+        const OVERLAP = 1 * 1024 * 1024;
+        let fileOffset = clusterStart;
+        let chunkNum = 0;
+
+        while (fileOffset < file.size) {
+            const readStart = fileOffset;
+            const readSize = Math.min(CHUNK_SIZE, file.size - readStart);
+            const chunkData = new Uint8Array(await file.slice(readStart, readStart + readSize).arrayBuffer());
+
+            const syncOffset = this.findClusterSync(chunkData, 0, Math.min(chunkData.length, 1024 * 1024));
+            const effectiveStart = syncOffset !== -1 ? syncOffset : 0;
+
+            if (syncOffset === -1 && chunkNum > 0) {
+                fileOffset = readStart + readSize;
+                chunkNum++;
+                continue;
+            }
+
+            let res = this.parseAudioChunk(chunkData, effectiveStart, chunkData.length, trackNumber, timecodeScale, frames);
+
+            // Cluster straddling the chunk boundary: read the full cluster separately,
+            // then continue with the rest of the chunk.
+            while (res.truncated) {
+                const cStart = readStart + res.start;
+                const cEnd = Math.min(readStart + res.end, file.size);
+                const clusterBuf = new Uint8Array(await file.slice(cStart, cEnd).arrayBuffer());
+                const clusterTimecode = this.parseClusterTimecode(clusterBuf, 0, Math.min(512, clusterBuf.length));
+                this.parseAudioBlocks(clusterBuf, 0, clusterBuf.length, trackNumber, timecodeScale, clusterTimecode, frames);
+                const nextOff = res.end;
+                if (nextOff >= chunkData.length) { res = { truncated: false }; break; }
+                res = this.parseAudioChunk(chunkData, nextOff, chunkData.length, trackNumber, timecodeScale, frames);
+            }
+
+            if (onProgress) onProgress(Math.min(1, (readStart + readSize) / file.size));
+
+            fileOffset = readStart + readSize - OVERLAP;
+            chunkNum++;
+            if (readSize < CHUNK_SIZE) break;
+        }
+
+        // CodecDelay (e.g. Opus pre-skip): ffmpeg demuxers subtract it from block
+        // timestamps, rounding to whole ms (block timecodes are ms integers).
+        // Apply the same shift so pts match ffmpeg's view of the timeline.
+        const trackMeta = parsed.tracks.find(t => t.number === trackNumber);
+        const delayMs = trackMeta && trackMeta.codecDelay ? Math.round(trackMeta.codecDelay / 1e6) : 0;
+        if (delayMs > 0) {
+            for (const f of frames) f.pts -= delayMs;
+        }
+
+        return frames;
+    }
+
+    // Parse clusters inside a chunk buffer; returns {truncated, start, end} if a
+    // cluster extends past the chunk end.
+    parseAudioChunk(uint8, offset, chunkEnd, trackNumber, timecodeScale, frames) {
+        while (offset < chunkEnd - 4) {
+            const elemId = this.readElementID(uint8, offset);
+            if (!elemId) break;
+
+            const sizeOffset = offset + elemId.length;
+            const elemSize = this.readVarInt(uint8, sizeOffset);
+            if (!elemSize) break;
+
+            const contentOffset = sizeOffset + elemSize.length;
+            const elemEnd = contentOffset + elemSize.value;
+
+            if (elemId.value === this.CLUSTER) {
+                if (elemEnd > chunkEnd) {
+                    return { truncated: true, start: offset, end: elemEnd };
+                }
+                const clusterTimecode = this.parseClusterTimecode(uint8, contentOffset, Math.min(contentOffset + 512, chunkEnd));
+                this.parseAudioBlocks(uint8, contentOffset, Math.min(elemEnd, chunkEnd), trackNumber, timecodeScale, clusterTimecode, frames);
+            }
+
+            if (elemEnd > chunkEnd) break;
+            offset = elemEnd;
+        }
+        return { truncated: false };
+    }
+
+    parseAudioBlocks(uint8, offset, end, trackNumber, timecodeScale, clusterTimecode, frames) {
+        while (offset < end - 4) {
+            const elemId = this.readElementID(uint8, offset);
+            if (!elemId) break;
+
+            const sizeOffset = offset + elemId.length;
+            const elemSize = this.readVarInt(uint8, sizeOffset);
+            if (!elemSize) break;
+
+            const contentOffset = sizeOffset + elemSize.length;
+            const elemEnd = contentOffset + elemSize.value;
+
+            if (elemId.value === this.SIMPLE_BLOCK) {
+                this.parseAudioBlock(uint8, contentOffset, elemSize.value, trackNumber, timecodeScale, clusterTimecode, frames);
+            } else if (elemId.value === this.BLOCK_GROUP) {
+                this.parseBlockGroupForAudio(uint8, contentOffset, Math.min(elemEnd, end), trackNumber, timecodeScale, clusterTimecode, frames);
+            }
+
+            if (elemEnd > end) break;
+            offset = elemEnd;
+        }
+    }
+
+    parseBlockGroupForAudio(uint8, offset, end, trackNumber, timecodeScale, clusterTimecode, frames) {
+        // Pre-scan for BlockDuration (comes after Block) so frames can carry it —
+        // the last block of a stream may be shorter than its TOC suggests.
+        let blockDurMs = null;
+        {
+            let scan = offset;
+            while (scan < end - 4) {
+                const elemId = this.readElementID(uint8, scan);
+                if (!elemId) break;
+                const elemSize = this.readVarInt(uint8, scan + elemId.length);
+                if (!elemSize) break;
+                const contentOffset = scan + elemId.length + elemSize.length;
+                if (elemId.value === this.BLOCK_DURATION && elemSize.value <= 8) {
+                    blockDurMs = (this.readUInt(uint8, contentOffset, elemSize.value) * timecodeScale) / 1e6;
+                }
+                scan = contentOffset + elemSize.value;
+            }
+        }
+
+        while (offset < end - 4) {
+            const elemId = this.readElementID(uint8, offset);
+            if (!elemId) break;
+
+            const sizeOffset = offset + elemId.length;
+            const elemSize = this.readVarInt(uint8, sizeOffset);
+            if (!elemSize) break;
+
+            const contentOffset = sizeOffset + elemSize.length;
+
+            if (elemId.value === this.BLOCK) {
+                this.parseAudioBlock(uint8, contentOffset, elemSize.value, trackNumber, timecodeScale, clusterTimecode, frames, blockDurMs);
+            }
+
+            offset = contentOffset + elemSize.value;
+        }
+    }
+
+    parseAudioBlock(uint8, offset, size, trackNumber, timecodeScale, clusterTimecode, frames, blockDurMs) {
+        if (size < 6) return;
+
+        const trackNum = this.readVarInt(uint8, offset);
+        if (!trackNum || trackNum.value !== trackNumber) return;
+
+        const dataOffset = offset + trackNum.length;
+        if (dataOffset + 3 > offset + size) return;
+
+        const relTime = this.readInt16(uint8, dataOffset);
+        const flags = uint8[dataOffset + 2];
+        const laceType = (flags & 0x06) >> 1;
+        const ptsMs = ((clusterTimecode + relTime) * timecodeScale) / 1000000;
+
+        // Dedupe overlapping chunk rescans
+        if (frames.length > 0 && ptsMs <= frames[frames.length - 1].pts) return;
+
+        const payload = uint8.slice(dataOffset + 3, offset + size);
+        const frameDatas = this.unlace(payload, laceType);
+        const perFrameDur = blockDurMs != null && frameDatas.length > 1 ? blockDurMs / frameDatas.length : blockDurMs;
+        for (const fd of frameDatas) {
+            if (fd.length > 0) frames.push({ data: fd, pts: ptsMs, durMs: perFrameDur != null ? perFrameDur : null });
+        }
+    }
+
+    // Split a laced block into individual frames
+    unlace(payload, laceType) {
+        if (laceType === 0 || payload.length === 0) return [payload];
+
+        const n = payload[0] + 1; // number of frames in this lace
+        if (n <= 1) return [payload.slice(1)];
+
+        const frames = [];
+        let p = 1;
+
+        if (laceType === 1) {
+            // Xiph lacing: (n-1) plain varints (0xFF = continue, +255)
+            const sizes = [];
+            for (let i = 0; i < n - 1; i++) {
+                let v = 0;
+                while (p < payload.length) {
+                    const b = payload[p++];
+                    v += b;
+                    if (b !== 0xFF) break;
+                }
+                sizes.push(v);
+            }
+            let off = p;
+            for (let i = 0; i < n - 1; i++) {
+                frames.push(payload.slice(off, off + sizes[i]));
+                off += sizes[i];
+            }
+            if (off < payload.length) frames.push(payload.slice(off));
+        } else if (laceType === 2) {
+            // Fixed-size lacing
+            const sz = Math.floor((payload.length - 1) / n);
+            let off = 1;
+            for (let i = 0; i < n; i++) {
+                frames.push(payload.slice(off, off + sz));
+                off += sz;
+            }
+            if (off < payload.length) {
+                const last = frames[frames.length - 1];
+                const merged = new Uint8Array(last.length + (payload.length - off));
+                merged.set(last);
+                merged.set(payload.slice(off), last.length);
+                frames[frames.length - 1] = merged;
+            }
+        } else if (laceType === 3) {
+            // EBML lacing: first size is a full vint, rest are SIGNED vint deltas
+            const sizes = [];
+            const first = this.readVarInt(payload, p);
+            if (!first) return [payload.slice(1)];
+            p += first.length;
+            let v = first.value;
+            sizes.push(v);
+            for (let i = 1; i < n - 1; i++) {
+                const d = this.readVarInt(payload, p);
+                if (!d) break;
+                p += d.length;
+                // Signed vint: the top bit of the value region is the sign
+                const signBits = 7 * d.length - 1;
+                const half = Math.pow(2, signBits);
+                v += d.value >= half ? d.value - half * 2 : d.value;
+                sizes.push(v);
+            }
+            let off = p;
+            for (const s of sizes) {
+                frames.push(payload.slice(off, off + s));
+                off += s;
+            }
+            if (off < payload.length) frames.push(payload.slice(off));
+        }
+
+        return frames;
+    }
+
+    // Returns the START of the first Cluster element (not its content), so scans
+    // begin exactly at a cluster boundary.
     findClusterOffset(uint8, startOffset, endOffset) {
         let offset = startOffset;
         while (offset < endOffset - 4) {
@@ -247,7 +538,7 @@ class MKVSubtitleExtractor {
             const contentOffset = sizeOffset + elemSize.length;
             
             if (elemId.value === this.CLUSTER) {
-                return contentOffset;
+                return offset;
             }
             
             offset = contentOffset + elemSize.value;
@@ -286,7 +577,12 @@ class MKVSubtitleExtractor {
             type: 0,
             language: 'und',
             codecId: '',
-            name: ''
+            name: '',
+            codecPrivate: null,
+            codecDelay: 0,
+            samplingFrequency: 0,
+            channels: 0,
+            bitDepth: 0
         };
 
         while (offset < end - 2) {
@@ -303,7 +599,7 @@ class MKVSubtitleExtractor {
             try {
                 switch (elemId.value) {
                     case this.TRACK_NUMBER:
-                        track.number = uint8[contentOffset];
+                        track.number = this.readUInt(uint8, contentOffset, elemSize.value);
                         break;
                     case this.TRACK_TYPE:
                         track.type = uint8[contentOffset];
@@ -314,8 +610,18 @@ class MKVSubtitleExtractor {
                     case this.CODEC_ID:
                         track.codecId = this.readString(uint8, contentOffset, elemSize.value);
                         break;
+                    case this.CODEC_DELAY:
+                        track.codecDelay = this.readUInt(uint8, contentOffset, elemSize.value);
+                        break;
                     case this.NAME:
                         track.name = this.readString(uint8, contentOffset, elemSize.value);
+                        break;
+                    case this.CODEC_PRIVATE:
+                        track.codecPrivate = new Uint8Array(uint8.slice(contentOffset, contentOffset + elemSize.value));
+                        break;
+                    case this.AUDIO_ELEMENT:
+                        // Audio settings are a nested master element
+                        this.parseAudioEntry(uint8, contentOffset, Math.min(contentOffset + elemSize.value, uint8.length), track);
                         break;
                 }
             } catch (e) {
@@ -326,6 +632,57 @@ class MKVSubtitleExtractor {
         }
 
         return track.type > 0 ? track : null;
+    }
+
+    parseAudioEntry(uint8, offset, end, track) {
+        while (offset < end - 2) {
+            const elemId = this.readElementID(uint8, offset);
+            if (!elemId) break;
+
+            const sizeOffset = offset + elemId.length;
+            const elemSize = this.readVarInt(uint8, sizeOffset);
+            if (!elemSize) break;
+
+            const contentOffset = sizeOffset + elemSize.length;
+
+            try {
+                switch (elemId.value) {
+                    case this.AUDIO_SAMPLING_FREQUENCY:
+                        track.samplingFrequency = this.readFloat(uint8, contentOffset, elemSize.value);
+                        break;
+                    case this.AUDIO_CHANNELS:
+                        track.channels = this.readUInt(uint8, contentOffset, elemSize.value);
+                        break;
+                    case this.AUDIO_BIT_DEPTH:
+                        track.bitDepth = this.readUInt(uint8, contentOffset, elemSize.value);
+                        break;
+                    case this.AUDIO_BLOCK_ALIGNMENT:
+                        track.blockAlignment = this.readUInt(uint8, contentOffset, elemSize.value);
+                        break;
+                }
+            } catch (e) {
+                // Skip
+            }
+
+            offset = contentOffset + elemSize.value;
+        }
+    }
+
+    readFloat(uint8, offset, length) {
+        // Matroska floats: big-endian, 0/4/8 bytes
+        if (length === 4) {
+            const buf = new ArrayBuffer(4);
+            const view = new DataView(buf);
+            for (let i = 0; i < 4; i++) view.setUint8(i, uint8[offset + i]);
+            return view.getFloat32(0, false);
+        }
+        if (length === 8) {
+            const buf = new ArrayBuffer(8);
+            const view = new DataView(buf);
+            for (let i = 0; i < 8; i++) view.setUint8(i, uint8[offset + i]);
+            return view.getFloat64(0, false);
+        }
+        return this.readUInt(uint8, offset, length);
     }
 
     findClusterSync(uint8, start, end) {

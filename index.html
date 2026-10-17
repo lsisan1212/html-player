@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HTML5 AI Player</title>
+    <title>HTML5 Player</title>
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/themes.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="header-content">
             <div class="logo">
                 <span class="logo-icon">▶</span>
-                <span class="logo-text">HTML5 AI Player</span>
+                <span class="logo-text">HTML5 Player</span>
             </div>
             <div class="header-filename" id="header-filename">
                 <span id="filename-display" class="header-filename-text"></span>
@@ -53,7 +53,7 @@
                         <div class="shortcut-row"><kbd>S</kbd> Screenshot</div>
                         <div class="shortcut-row"><kbd>C</kbd> Cycle subtitle tracks</div>
                         <div class="shortcut-row"><kbd>V</kbd> Cycle subtitle theme</div>
-                        <div class="shortcut-row"><kbd>A</kbd> Open AI Commentator</div>
+                        <div class="shortcut-row"><kbd>A</kbd> Cycle audio tracks</div>
                         <div class="shortcut-row"><kbd>0-9</kbd> Jump to 0%–90%</div>
                         <div class="shortcut-row"><kbd>&lt;</kbd> <kbd>&gt;</kbd> Speed down/up</div>
                     </div>
@@ -66,10 +66,10 @@
                 </div>
 
                 <div class="readme-section">
-                    <h3>🤖 AI Commentator</h3>
-                    <p>Click <strong>🤖</strong> to open AI settings. Select a language, paste your <strong>OpenRouter API key</strong>, and the AI will react to movie dialogue in real-time.</p>
-                    <p><strong>Default model:</strong> Llama 3.2 3B (fast & cheap). You can also choose Qwen 2.5, GPT-4o Mini, Claude, or any custom model.</p>
-                    <p>⚠️ Must run via <code>http://localhost</code> — not <code>file://</code>. Use <code>python3 -m http.server 8000</code> to start a local server.</p>
+                    <h3>🔊 Audio Tracks</h3>
+                    <p>Movies with <strong>multiple audio tracks</strong> (dual audio, e.g. Cantonese + Mandarin) show a <strong>🎵 selector</strong> in the control bar once loaded.</p>
+                    <p>MKV/MP4/MOV audio tracks are listed with language and codec. In Chrome/Edge/Firefox the selected track is extracted and played in sync (AAC / MP3 / Opus / FLAC). Safari switches tracks natively.</p>
+                    <p>Press <strong>A</strong> to cycle audio tracks. AC-3 / E-AC3 / DTS tracks are marked ⚠ — they cannot be decoded by the browser.</p>
                 </div>
 
                 <div class="readme-section">
@@ -122,10 +122,6 @@
                 </div>
                 <div id="subtitle-container" class="subtitle-container">
                     <div id="subtitle-text" class="subtitle-text sub-theme-default"></div>
-                </div>
-                
-                <div id="ai-comments-container" class="ai-comments-container hidden">
-                    <div class="ai-comments-list" id="ai-comments-list"></div>
                 </div>
 
                 <!-- Fullscreen Overlay -->
@@ -199,44 +195,13 @@
                     </div>
 
                     <div class="controls-right">
-                        <button id="ai-btn" class="control-btn" title="AI Commentator (A)">
-                            <span class="icon">🤖</span>
-                        </button>
-                        <div id="ai-dropdown" class="theme-dropdown hidden" style="right: 180px; width: 280px;">
-                            <div class="theme-grid" style="margin-bottom: 12px;">
-                                <button class="ai-option active" data-lang="off">🚫 No AI</button>
-                                <button class="ai-option" data-lang="en">🇺🇸 English</button>
-                                <button class="ai-option" data-lang="zh-CN">🇨🇳 简体中文</button>
-                                <button class="ai-option" data-lang="zh-TW">🇹🇼 繁體中文</button>
-                                <button class="ai-option" data-lang="yue">🇭🇰 廣東話</button>
-                                <button class="ai-option" data-lang="ja">🇯🇵 日本語</button>
-                                <button class="ai-option" data-lang="ko">🇰🇷 한국어</button>
-                                <button class="ai-option" data-lang="th">🇹🇭 ภาษาไทย</button>
-                            </div>
-                            
-                            <div class="ai-settings" style="border-top: 1px solid var(--border-color); padding-top: 12px; display: flex; flex-direction: column; gap: 8px;">
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); text-align: left; margin-bottom: 2px; font-weight: 500;">API Configuration (OpenRouter Compatible)</div>
-                                
-                                <input type="text" id="ai-base-url" placeholder="Base URL (default: https://openrouter.ai/api/v1)"
-                                       style="width: 100%; padding: 6px 8px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; outline: none;">
-                                
-                                <select id="ai-model-select" style="width: 100%; padding: 6px 8px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; outline: none; cursor: pointer;">
-                                    <option value="stepfun/step-3.5-flash:free">⚡ Step 3.5 Flash (Free)</option>
-                                    <option value="qwen/qwen3.6-plus:free">🔮 Qwen 3.6 Plus (Free)</option>
-                                    <option value="meta-llama/llama-3.2-3b-instruct">🦙 Llama 3.2 3B (Fast)</option>
-                                    <option value="custom">✏️ Custom Model...</option>
-                                </select>
-                                
-                                <input type="text" id="ai-model" placeholder="Custom model name (optional)"
-                                       style="width: 100%; padding: 6px 8px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; outline: none; display: none;">
-                                
-                                <input type="password" id="ai-api-key" placeholder="API Key (OpenRouter)"
-                                       style="width: 100%; padding: 6px 8px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; outline: none;">
-                                
-                                <button id="ai-test-btn" style="width: 100%; padding: 6px 8px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 0.75rem; cursor: pointer; margin-top: 4px; font-weight: 500; transition: background 0.3s ease;">
-                                    Test Connection
-                                </button>
-                            </div>
+                        <div class="audio-track-selector">
+                            <button id="audio-btn" class="control-btn" title="Audio Track (A)">
+                                <span class="icon">🎵</span>
+                            </button>
+                            <select id="audio-track-select" class="audio-track-select" title="Audio Track">
+                                <option value="-1">Audio 1</option>
+                            </select>
                         </div>
                         <button id="subtitle-btn" class="control-btn" title="Load Subtitle File">
                             <span class="icon">💬</span>
@@ -318,6 +283,10 @@
                             <span id="info-duration" class="info-value">—</span>
                         </div>
                         <div class="info-item">
+                            <span class="info-label">Audio</span>
+                            <span id="info-audio" class="info-value">—</span>
+                        </div>
+                        <div class="info-item">
                             <span class="info-label">Subtitles</span>
                             <span id="info-subtitles" class="info-value">None</span>
                         </div>
@@ -349,7 +318,7 @@
                         </div>
                         <div class="shortcut-item">
                             <kbd>A</kbd>
-                            <span>AI Buddy</span>
+                            <span>Cycle Audio Tracks</span>
                         </div>
                         <div class="shortcut-item">
                             <kbd>C</kbd>
@@ -375,14 +344,14 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-        <p>v2.7 — 2026-07-23</p>
+        <p>v2.8 — 2026-10-17</p>
     </footer>
 
     <script src="js/player.js"></script>
     <script src="js/mkv-extractor.js"></script>
+    <script src="js/audio-tracks.js"></script>
     <script src="js/controls.js"></script>
     <script src="js/subtitles.js"></script>
     <script src="js/keyboard.js"></script>
-    <script src="js/ai-buddy.js"></script>
 </body>
 </html>

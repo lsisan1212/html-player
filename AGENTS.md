@@ -1,4 +1,4 @@
-# HTML5 AI Player - Agent Guidelines
+# HTML5 Player - Agent Guidelines
 
 ## Overview
 This is a standalone HTML5 video player with no build system or external dependencies.
@@ -6,7 +6,7 @@ This is a standalone HTML5 video player with no build system or external depende
 ## Project Structure
 - **index.html**: Main entry point
 - **css/**: Stylesheets (base + 10 themes)
-- **js/**: JavaScript modules (player, controls, subtitles, keyboard)
+- **js/**: JavaScript modules (player, controls, subtitles, audio-tracks, keyboard)
 
 ## Commands
 

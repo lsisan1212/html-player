@@ -128,9 +128,9 @@ class KeyboardManager {
                 case 'a':
                 case 'A':
                     e.preventDefault();
-                    // Just click the button to open the menu!
-                    const aiBtn = document.getElementById('ai-btn');
-                    if (aiBtn) aiBtn.click();
+                    if (typeof audioTracks !== 'undefined' && audioTracks.cycleTrack) {
+                        audioTracks.cycleTrack();
+                    }
                     break;
 
                 case 'c':

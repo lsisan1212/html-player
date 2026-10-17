@@ -653,6 +653,55 @@ body {
     color: var(--text-primary);
 }
 
+/* Audio Track Selector */
+.audio-track-selector {
+    display: flex;
+    align-items: center;
+}
+
+.audio-track-select {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.3rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    outline: none;
+    max-width: 130px;
+    transition: all 0.2s ease;
+}
+
+.audio-track-select:hover,
+.audio-track-select:focus {
+    border-color: var(--accent);
+}
+
+.audio-track-select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.audio-track-select option.unsupported {
+    color: #ef4444;
+}
+
+/* Audio extraction progress (shown in OSD) */
+.audio-extract-progress {
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    z-index: 100;
+    pointer-events: none;
+}
+
 /* Theme Name Display */
 .theme-name {
     font-size: 0.75rem;
@@ -946,84 +995,6 @@ body.is-pip .subtitle-container {
     font-weight: 600;
     color: var(--text-primary);
     box-shadow: 0 1px 0 var(--border-color);
-}
-
-/* ===== AI Commentator ===== */
-.ai-comments-container {
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-    width: 350px;
-    max-height: 40vh;
-    pointer-events: none;
-    z-index: 40;
-    mask-image: linear-gradient(to top, transparent, black 15%, black 100%);
-    -webkit-mask-image: linear-gradient(to top, transparent, black 15%, black 100%);
-}
-
-.ai-comments-container.hidden {
-    display: none;
-}
-
-.ai-comments-list {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    height: 100%;
-}
-
-.ai-comment {
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    border-left: 3px solid var(--accent);
-    color: white;
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    font-family: 'Arial', sans-serif;
-    animation: slideInLeft 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.ai-comment .ai-name {
-    color: var(--accent);
-    font-weight: bold;
-    margin-right: 5px;
-}
-
-@keyframes slideInLeft {
-    0% { transform: translateX(-20px); opacity: 0; }
-    100% { transform: translateX(0); opacity: 1; }
-}
-
-.ai-btn-active {
-    background: var(--accent) !important;
-    border-radius: 8px !important;
-}
-
-/* AI option buttons in dropdown */
-.ai-option {
-    padding: 0.5rem 0.75rem;
-    background: var(--bg-tertiary);
-    border: 2px solid transparent;
-    border-radius: 8px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.ai-option:hover {
-    background: var(--bg-hover);
-    border-color: var(--accent);
-}
-
-.ai-option.active {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: white;
 }
 
 /* ===== Fullscreen ===== */

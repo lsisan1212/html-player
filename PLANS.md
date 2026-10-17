@@ -1,4 +1,4 @@
-# HTML5 AI Player - Implementation Plan
+# HTML5 Player - Implementation Plan
 
 ## Overview
 Build a feature-rich HTML5 video player with 10 themes, subtitle support, playback speed control, and keyboard shortcuts.
@@ -37,6 +37,7 @@ html5 player/
 │   ├── player.js       # Core player logic
 │   ├── controls.js     # UI controls
 │   ├── subtitles.js    # Subtitle parsing/display
+│   ├── audio-tracks.js # Audio track enumeration + switching
 │   └── keyboard.js     # Keyboard shortcuts
 └── docs/
     └── ARCHITECTURE.md
