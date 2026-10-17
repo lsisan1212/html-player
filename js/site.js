@@ -1,6 +1,6 @@
 // Page shell around <movi-player>:
 //  - open a local file (picker or drag & drop)
-//  - grey the picture out while paused, restore colour on play
+//  - grey the picture out AND zoom it in 10% while paused; restore on play
 (() => {
     const player = document.getElementById('player');
     const stage = document.getElementById('stage');
@@ -10,6 +10,13 @@
     const nameEl = document.getElementById('file-name');
 
     const GRAY_FILTER = 'grayscale(1) brightness(0.9)';
+    const ZOOM = 1.1; // pause = +10% zoom
+
+    const reduceMotion = window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const EASE = reduceMotion
+        ? 'none'
+        : 'transform 220ms cubic-bezier(.2, .8, .2, 1), filter 180ms ease';
 
     // The picture lives on a canvas (WebCodecs) or a <video> (native/DASH fallback)
     // inside the element's open shadow root — style those, so the controls keep colour.
@@ -22,19 +29,53 @@
         return els;
     };
 
-    const paintFilter = (gray) => {
+    // Subtitle / poster layers are siblings of the canvas, so they have to be
+    // transformed too — otherwise the picture grows but the subtitles stay put.
+    const zoomEls = () => {
         const els = pictureEls();
-        for (const el of els) el.style.filter = gray ? GRAY_FILTER : '';
-        return els.length > 0;
+        const root = player.shadowRoot;
+        if (root) {
+            root.querySelectorAll('.movi-subtitle-overlay, .movi-poster-overlay')
+                .forEach((el) => els.push(el));
+        }
+        return els;
+    };
+
+    // The element writes its own inline transform (e.g. `rotate(90deg)` or `none`
+    // for the 180° video-rotation button), so our zoom is *composed* with it
+    // instead of replacing it: `rotate(90deg) scale(1.1)`.
+    const SCALE_RE = /\s*scale\([^)]*\)\s*/g;
+    const stripScale = (value) => {
+        const kept = String(value || '').replace(SCALE_RE, ' ').trim();
+        return kept === 'none' ? '' : kept;
+    };
+    const withScale = (value) => {
+        const base = stripScale(value);
+        return base ? `${base} scale(${ZOOM})` : `scale(${ZOOM})`;
+    };
+
+    const paintLook = (paused) => {
+        const media = pictureEls();
+        if (!media.length) return false;
+        for (const el of media) {
+            el.style.transition = EASE;
+            el.style.filter = paused ? GRAY_FILTER : '';
+        }
+        for (const el of zoomEls()) {
+            el.style.transition = EASE;
+            el.style.transformOrigin = 'center center';
+            el.style.transform = paused ? withScale(el.style.transform) : stripScale(el.style.transform);
+        }
+        return true;
     };
 
     const applyPausedLook = (paused) => {
-        if (paintFilter(paused)) return;
+        if (paintLook(paused)) return;
         // Element still booting (shadow root / canvas not ready) — retry briefly
         let tries = 0;
         const timer = setInterval(() => {
             tries++;
-            if (paintFilter(paused) || tries > 40) clearInterval(timer);
+            if (paintLook(paused) || tries > 40) clearInterval(timer);
         }, 100);
     };
 
@@ -83,14 +124,19 @@
     player.addEventListener('pause', () => applyPausedLook(true));
     player.addEventListener('ended', () => applyPausedLook(true));
 
-    // Safety net: some paths (seek-to-start, source swap) settle paused state
-    // without a matching event — poll the property as well.
+    // Safety net: some paths (seek-to-start, source swap, rotation / fit change)
+    // settle paused state — or overwrite the inline transform — without a
+    // matching event. Poll the property and re-compose the look while paused
+    // (paintLook is idempotent, so this costs nothing when nothing changed).
     let lastPaused = null;
     setInterval(() => {
         const p = player.paused;
-        if (typeof p === 'boolean' && p !== lastPaused) {
+        if (typeof p !== 'boolean') return;
+        if (p !== lastPaused) {
             lastPaused = p;
             applyPausedLook(p);
+        } else if (p) {
+            paintLook(true);
         }
     }, 250);
 
