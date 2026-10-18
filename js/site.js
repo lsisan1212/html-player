@@ -146,4 +146,89 @@
             .then(() => console.log('[site] movi-player defined'))
             .catch(() => {});
     }
+
+    // ----- Keyboard: ←/→ = seek ±5s, ↑/↓ = volume -----
+    // The element binds the same keys itself (seek ±10s, volume ±0.1) on the
+    // host, in the bubble phase — so we sit on document/capture, which runs
+    // first, and swallow the event before it reaches the element.
+    const SEEK_STEP = 5;
+    const VOLUME_STEP = 0.05;
+
+    const maxVolume = () => {
+        const v = typeof player.getMaxVolume === 'function'
+            ? Number(player.getMaxVolume()) : 1;
+        return Number.isFinite(v) && v > 0 ? v : 1;
+    };
+
+    const seekBy = (dir) => {
+        if (typeof player.performRelativeSeek === 'function') {
+            player.performRelativeSeek(dir, SEEK_STEP); // player draws its own "+ 5s" OSD
+            return;
+        }
+        // fallback if that helper ever goes away
+        const dur = Number(player.duration);
+        const limit = Number.isFinite(dur) && dur > 0 ? dur : Infinity;
+        const target = (Number(player.currentTime) || 0) + (dir === 'left' ? -SEEK_STEP : SEEK_STEP);
+        player.currentTime = Math.max(0, Math.min(limit, target));
+    };
+
+    const stepVolume = (delta) => {
+        const capped = maxVolume();
+        // 1.0 = "normal" (the element allows up to 2.0), so report plain percent
+        // of the element's own scale — 100% means normal, not 50% of the cap.
+        const level = Number(player.volume) || 0;
+        const next = Math.round(Math.min(capped, Math.max(0, level + delta)) * 100) / 100;
+        if (delta > 0 && player.muted) player.muted = false; // ↑ un-mutes
+        player.volume = next;
+        const pct = Math.round(next * 100);
+        const icon = next === 0 ? '🔇' : next < 0.5 ? '🔉' : '🔊';
+        if (typeof player.showOSD === 'function') {
+            player.showOSD('', `${icon} ${pct}%`);
+        }
+    };
+
+    const isTypingTarget = (e) => {
+        const t = (e.composedPath && e.composedPath()[0]) || e.target;
+        if (!t) return false;
+        const tag = (t.tagName || '').toUpperCase();
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable === true;
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+        const k = e.key;
+        if (k !== 'ArrowLeft' && k !== 'ArrowRight' && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+        if (isTypingTarget(e)) return; // let sliders / search boxes keep their arrows
+        e.preventDefault();            // arrows must not scroll the page
+        e.stopPropagation();           // …and must not reach the element's own handler
+        if (k === 'ArrowLeft') seekBy('left');
+        else if (k === 'ArrowRight') seekBy('right');
+        else stepVolume(k === 'ArrowUp' ? VOLUME_STEP : -VOLUME_STEP);
+    }, true);
+
+    // The built-in "?" help panel advertises ±10s — keep it honest.
+    const patchShortcutHelp = () => {
+        const root = player.shadowRoot;
+        if (!root) return;
+        const want = `Seek ±${SEEK_STEP}s`;
+        root.querySelectorAll('[data-fastseek-keys] span').forEach((el) => {
+            if (el.textContent !== want) el.textContent = want;
+        });
+    };
+
+    let patchQueued = false;
+    if (window.MutationObserver) {
+        const mo = new MutationObserver(() => {
+            if (patchQueued) return;
+            patchQueued = true;
+            requestAnimationFrame(() => { patchQueued = false; patchShortcutHelp(); });
+        });
+        const attach = () => {
+            const root = player.shadowRoot;
+            if (!root) { setTimeout(attach, 300); return; }
+            mo.observe(root, { childList: true, subtree: true });
+            patchShortcutHelp();
+        };
+        attach();
+    }
 })();

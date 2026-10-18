@@ -4,13 +4,18 @@
 
 - 拖放或選檔即播
 - **暫停時畫面變灰階並放大 10%，繼續播放自動回復彩色與原尺寸**
+- 鍵盤：`←` / `→` 後退 / 前進 **5 秒**，`↑` / `↓` 音量 ±5%（靜音時按 `↑` 會自動解除靜音）
 - 字幕：內嵌軌切換 + 「Add subtitle file…」外掛 `.srt` / `.vtt` / `.ass`
-- 鍵盤快捷鍵按 `?` 查看
+- 其他快捷鍵按 `?` 查看
 
 ## 技術
 
 播放引擎是 [Movi Player](https://github.com/MrUjjwalG/movi-player)（Apache-2.0）的 `element.slim` 建置：
-WebCodecs 硬解 + FFmpeg WASM 軟解，畫到 canvas；本頁只加了一層外殼（開檔 / 拖放 / 暫停灰階 + 放大）。
+WebCodecs 硬解 + FFmpeg WASM 軟解，畫到 canvas；本頁只加了一層外殼（開檔 / 拖放 / 暫停灰階 + 放大 / 方向鍵）。
+
+方向鍵：播放器自己把方向鍵綁在 **host 的 bubble 階段**（seek ±10s、音量 ±0.1），本頁在
+`document` 的 **capture 階段**先一步攔下（`preventDefault` + `stopPropagation`），改成 seek ±5s、
+音量 ±0.05，所以唔會兩邊同時觸發。
 
 外殼用 `player.shadowRoot` 直接改內部的 `canvas`（畫面本體）與 `.movi-subtitle-overlay`（字幕層），
 暫停時落 `filter: grayscale(1)` 同 `transform: scale(1.1)`。縮放是**疊加**在播放器自己的 inline
