@@ -173,9 +173,34 @@
     stage.classList.add('is-empty');
     if (window.customElements) {
         customElements.whenDefined('movi-player')
-            .then(() => console.log('[site] movi-player defined'))
+            .then(() => { holdPlayPauseIcon(); console.log('[site] movi-player defined'); })
             .catch(() => {});
     }
+
+    // The control-bar button is driven by the element's *internal* state
+    // (`getState()` / `isPlaybackIntended()`), so it flips back to ▶ for a moment
+    // on every seek/buffer — you never pressed pause, yet a play triangle blinks
+    // in the bar. Pin it to the real intent instead: not paused → ⏸.
+    function holdPlayPauseIcon() {
+        const original = player.updatePlayPauseIcon;
+        if (typeof original !== 'function' || original.__siteWrapped) return;
+        const wrapped = function (...args) {
+            const out = original.apply(this, args);
+            if (!this.paused) {
+                const root = this.shadowRoot;
+                if (root) {
+                    const play = root.querySelector('.movi-icon-play');
+                    const pause = root.querySelector('.movi-icon-pause');
+                    if (play) play.style.display = 'none';
+                    if (pause) pause.style.display = 'block';
+                }
+            }
+            return out;
+        };
+        wrapped.__siteWrapped = true;
+        player.updatePlayPauseIcon = wrapped;
+    }
+    holdPlayPauseIcon(); // element is already upgraded (its script loads first)
 
     // ----- Keyboard: ←/→ = seek ±5s, ↑/↓ = volume -----
     // The element binds the same keys itself (seek ±10s, volume ±0.1) on the

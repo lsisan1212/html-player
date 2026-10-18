@@ -21,6 +21,10 @@ WebCodecs 硬解 + FFmpeg WASM 軟解，畫到 canvas；本頁只加了一層外
 `.movi-center-play-pause` 的 `movi-center-visible` 重新加上，畫面中間就會閃一下 ▶。
 本頁用 `data-playing` 屬性 + shadow DOM 內的 `style` 在播放時把它壓住，暫停時照常可用。
 
+控制列左下角的 ▶/⏸ 由播放器**內部狀態**驅動（`getState()` / `isPlaybackIntended()`），所以
+每次快進／緩衝都會短暫翻成 ▶。本頁把 `updatePlayPauseIcon` 包一層，改用真正的 `paused` 判斷 ——
+只要未暫停就一直顯示 ⏸。
+
 外殼用 `player.shadowRoot` 直接改內部的 `canvas`（畫面本體）與 `.movi-subtitle-overlay`（字幕層），
 暫停時落 `filter: grayscale(1)` 同 `transform: scale(1.1)`。縮放是**疊加**在播放器自己的 inline
 transform 之上（例如 180° 旋轉的 `rotate(90deg) scale(1.1)`），所以旋轉功能不會被蓋掉。
