@@ -55,6 +55,9 @@
     };
 
     const paintLook = (paused) => {
+        // Let the stylesheet below know whether the picture is actually moving —
+        // the element likes to re-show its centre ▶ pill during internal reloads.
+        player.toggleAttribute('data-playing', !paused);
         const media = pictureEls();
         if (!media.length) return false;
         for (const el of media) {
@@ -66,6 +69,32 @@
             el.style.transformOrigin = 'center center';
             el.style.transform = paused ? withScale(el.style.transform) : stripScale(el.style.transform);
         }
+        return true;
+    };
+
+    // The element draws a big ▶/⏸ pill in the middle of the frame and toggles it
+    // from several places: the 800 ms "flash" on play/pause, the "poster" state
+    // before the first frame is shown, and its own frozen/stuck recovery (it
+    // snapshots the last frame, rebuilds the player, and the UI tick re-adds
+    // `.movi-center-visible` while the spinner is briefly down). That reads as a
+    // play symbol blinking over the movie. While the picture is really moving we
+    // simply keep the pill hidden — paused behaviour is untouched.
+    const CENTER_PATCH_CSS = `
+        :host([data-playing]) .movi-center-play-pause {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            transition: none !important;
+        }`;
+
+    const ensureCenterPatch = () => {
+        const root = player.shadowRoot;
+        if (!root) return false;
+        if (root.querySelector('style[data-site-center-patch]')) return true;
+        const style = document.createElement('style');
+        style.setAttribute('data-site-center-patch', '');
+        style.textContent = CENTER_PATCH_CSS;
+        root.appendChild(style);
         return true;
     };
 
@@ -130,6 +159,7 @@
     // (paintLook is idempotent, so this costs nothing when nothing changed).
     let lastPaused = null;
     setInterval(() => {
+        ensureCenterPatch(); // the element rebuilds its shadow DOM on recovery
         const p = player.paused;
         if (typeof p !== 'boolean') return;
         if (p !== lastPaused) {
